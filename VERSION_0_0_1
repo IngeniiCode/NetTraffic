@@ -1,8 +1,13 @@
 + ---------------------------------------------------
 +   VERSION  0.0.1  --  early development
 + ---------------------------------------------------
-22-MAR-2014 -- Adding work to repository
+22-MAR-2014 -- (Adding work to repository)
  * PcapFile Analysis engine
  * Report Generator
  * Raw data packet extractor
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
+22-MAR-2014 --  VERSION 0.0.1.a
+ * finished re-org
+ * removed unwanted print statements
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
 

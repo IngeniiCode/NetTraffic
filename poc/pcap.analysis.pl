@@ -7,7 +7,7 @@ $| = 1;
 #
 #  Define required modules
 #
-use PCAP::PcapAnalysis;
+use PCAP::Analysis;
 use PCAP::Xlsx::Analysis;
 use Data::Dumper;
 

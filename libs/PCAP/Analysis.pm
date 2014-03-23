@@ -374,7 +374,7 @@ sub _tcpip {
 	my $content_type  = $REPORT->{ACKCHAIN}{$acknum}{content_type} || '';
 	my $encoding_type = $REPORT->{ACKCHAIN}{$acknum}{encoding_type} || ''; 
 
-printf("TCP/IP data:%s\n",Dumper @items);
+# printf("TCP/IP data:%s\n",Dumper @items);
 
 	foreach my $item (@items) {
 		if ($item =~ /^Content-Type:\s+(.*)/i) {
