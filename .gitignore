@@ -3,3 +3,9 @@
 *.xlsx
 
 *.pcapng
+
+*.swp
+
+*.gz
+
+*.tgz
