@@ -70,6 +70,9 @@ sub process_file {
 	# Collect Conversations
 	$self->_loop('syn_only');
 
+	# Process each Conversation
+	$self->_process_conversations();
+
 #	# COLLECT THE TCP PACKETS
 #	$self->_loop('tcp');
 #
@@ -79,7 +82,31 @@ sub process_file {
 	return $self->{CONV};
 }
 
+# +
+# +   Conversation Processing
+# +
+sub _process_conversations {
+	my($self) = @_;
 
+printf("%s\n",uc((caller(0))[3]));
+
+	foreach my $cIndex (keys %{$self->{'CONV'}{SYN}}){
+		my $filter;
+		my $filter_c;  # hold the compiled filter
+		printf("IDX: %06d\n",$cIndex); 
+		my $C = $self->{'CONV'}{SYN}{$cIndex};  # localize this thing
+		# Build a filter based on this conversations knows
+		# read entire conversation
+		# construct a filter
+		$filter = sprintf('tcp and (host %s and host %s) and (port %d and port %d)',$C->{src_ip},$C->{dest_ip},$C->{src_port},$C->{dest_port});
+printf("FILTER: %s\n",$filter);
+		$self->_assemble_conversation($cIndex,$filter);
+	
+	}
+	return;
+}
+
+# +
 # +   Packet Processing
 # +
 sub _loop {
@@ -88,7 +115,7 @@ sub _loop {
 	my $filter_c;  # holder for compiled filter
 	my $fname = sprintf('_proc_%s',$proto||'tcp');
 
-printf("%s proto:%s\n",uc((caller(0))[3]),$proto);
+printf("%s('%s');\n",uc((caller(0))[3]),$proto);
 
        	# init the pcap file for processing. 
         $self->_init_pcap();  # not required to set if already set
@@ -112,6 +139,37 @@ printf("%s proto:%s\n",uc((caller(0))[3]),$proto);
 }
 
 	
+# +
+# +   Packet Processing
+# +
+sub _assemble_conversation {
+	my($self,$cIndex,$filter) = @_;
+	# -- beware of locals
+	my $filter_c;  # holder for compiled filter
+
+printf("%s('%s','%s');\n",uc((caller(0))[3]),$cIndex,$filter);
+
+       	# init the pcap file for processing. 
+        $self->_init_pcap();  # not required to set if already set
+
+	# -- reset conversation counter
+	$self->{conversation_index} = 0;
+
+	# create the filter
+	Net::Pcap::compile( $self->{PCAP}, \$filter_c, $filter, 1, undef );
+	Net::Pcap::setfilter( $self->{PCAP}, $filter_c );
+
+	# read all the packets
+	Net::Pcap::loop( $self->{PCAP}, -1, \&_read_all_matching, [$self,$cIndex] );  # self is passed as user data
+
+	# close the network file (since we have finished our processing)
+	Net::Pcap::close( $self->{PCAP} );
+
+	exit;  # TEMPORARY DEBUGGING STRATEGY
+
+	return;
+}
+
 # + + + + + + + + + + + + + + + + + + + +
 # +  --   S E M I - P R I V A T E   --  +
 # + + + + + + + + + + + + + + + + + + + +
@@ -152,23 +210,83 @@ sub _proc_syn_only {
 
 	# record the conversation
 	$self->{'CONV'}{SYN}{$idx} = {
+		'index'     => $idx,
 		'proto'     => $lproto,  
 		'src_ip'    => $ip_pac->{'src_ip'},
 		'src_port'  => $trans->{'src_port'},
-		'src_srvc'  => ($trans->{'src_port'}) ? $PORTS->get_info($trans->{'src_port'},$lproto) : {},
 		'dest_ip'   => $ip_pac->{'dest_ip'},
 		'dest_port' => $trans->{'dest_port'},
-		'dest_srvc' => ($trans->{'dets_port'}) ? $PORTS->get_info($trans->{'dest_port'},$lproto) : {},
 		'flags'     => $trans->{'flags'},
 		'hostname'  => '',
 	};
 
 	# figure out a service
 	if(my $srvc = $PORTS->get_info($trans->{'dest_port'},$lproto)){
-		$self->{'CONV'}{SYN}{$idx}{service} = $srvc->{'description'} || $srvc->{'service'}; 
+		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'}; 
 	}
 	elsif (my $srvc = $PORTS->get_info($trans->{'src_port'},$lproto)) {
-		$self->{'CONV'}{SYN}{$idx}{service} = $srvc->{'description'} || $srvc->{'service'};
+		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'};
+	}
+
+	if($trans->{'src_port'} == 53 || $trans->{'dest_port'} == 53) {
+		# DNS!
+		$self->{'CONV'}{'SYN'}{$idx}{dns} = $self->_Net_DNS_Packet($trans);	
+	}
+
+	return;
+}
+
+# +
+# +  process the SYN Packets
+# +
+sub _read_all_matching {
+	my ($self,$cIndex,$header,$pack) = @_;
+	# -- beware of locals
+        my $fcheck;
+        my $input;
+	my $eth_pac;
+	my $ip_pac;
+	my $trans;
+	my $lproto;
+	my $service;
+	my $idx;  # index counter
+
+printf("%s('%s',%d,'%s','%s');\n",uc((caller(0))[3]),$self,$cIndex,$header,$pack);
+	return;
+
+	# Ethernet Packet processing 
+	$eth_pac  = NetPacket::Ethernet->decode( $pack );  # set ethernet packet 
+
+	# IP Packet processing
+	$ip_pac   = NetPacket::IP->decode( $eth_pac->{'data'} );  # 
+
+	switch ($ip_pac->{'proto'}) {
+		case   6    {  $lproto = 'tcp';  $trans = NetPacket::TCP->decode( $ip_pac->{'data'} );  }
+		case  17    {  $lproto = 'upd';  $trans = NetPacket::UDP->decode( $ip_pac->{'data'} );  }
+	};
+
+	# Define a bitmask for SYN packets
+	$fcheck = $trans->{'flags'} & 0x3f;
+
+
+	# record the conversation
+	$self->{'CONV'}{SYN}{$idx} = {
+		'index'     => $idx,
+		'proto'     => $lproto,  
+		'src_ip'    => $ip_pac->{'src_ip'},
+		'src_port'  => $trans->{'src_port'},
+		'dest_ip'   => $ip_pac->{'dest_ip'},
+		'dest_port' => $trans->{'dest_port'},
+		'flags'     => $trans->{'flags'},
+		'hostname'  => '',
+	};
+
+	# figure out a service
+	if(my $srvc = $PORTS->get_info($trans->{'dest_port'},$lproto)){
+		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'}; 
+	}
+	elsif (my $srvc = $PORTS->get_info($trans->{'src_port'},$lproto)) {
+		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'};
 	}
 
 	if($trans->{'src_port'} == 53 || $trans->{'dest_port'} == 53) {

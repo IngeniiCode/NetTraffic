@@ -93,24 +93,20 @@ sub _summary {
 
 	# Add header
 	$sum_ws->merge_range(0,0,0,14,'',$fmt->{header});
-	$sum_ws->write_string(0,0,sprintf('Network Analysis Summary for %s',$self->{basename}),$fmt->{header});
+	$sum_ws->write_string(0,0,sprintf('Network Analysis Summary for   [ %s ]',$self->{basename}),$fmt->{header});
 
 	# Conversation Information
 	$sum_ws->merge_range(2,0,2,14,'',$fmt->{section});
-	$sum_ws->write_string(2,0,sprintf(' %d   Network Conversations to Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
-
-	
+	$sum_ws->write_string(2,0,sprintf(' %d   Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
 
 	# Groupings
-	$sum_ws->merge_range(4,0,4,6,'',$fmt->{section});
+	$sum_ws->merge_range(4,0,4,4,'',$fmt->{sub_sect});
 	$sum_ws->write_string(4,0,'Types of Communication Detected',$fmt->{sub_sect});
+	$self->_insert_traffic_data_types(\$sum_ws,5,0,7);  # send worksheet, and starting co-ordinate and columns
 
-	$self->_insert_traffic_data($sum_ws,5,0,6);  # send worksheet, and starting co-ordinate and columns
-
-#	$sum_ws->merge_range(4,4,4,6,'',$fmt->{section});
-#	$sum_ws->write_string(4,4,'Remote Addresses Interactions',$fmt->{sub_sect});
-
-	
+	$sum_ws->merge_range(4,6,4,10,'',$fmt->{sub_sect});
+	$sum_ws->write_string(4,6,'Remote Server IPs',$fmt->{sub_sect});
+	$self->_insert_traffic_data_destinations(\$sum_ws,5,6,10);  # send worksheet, and starting co-ordinate and columns
 
 	return;
 
@@ -132,35 +128,70 @@ sub _summary {
 # +
 # +  insert traffic types
 # +
-sub _insert_traffic_data {
+sub _insert_traffic_data_types {
 	my($self,$ws,$row_start,$col_start,$col_end) = @_;
+
+	my $PopTypes  = $self->{'CONVS'}{'POPULARITY'}{'traffic_types'};
+	my $GrpTypes  = $self->{'CONVS'}{'GROUPED'}{'traffic_types'};
 	
 	my @types = ();
 	my @destinations = ();
 
 	# add the titles
-	$ws->write_string($row_start,$col_start,'Conversations',$fmt->{title});
-	$ws->write_string($row_start,$col_start+2,'Service Type',$fmt->{title});
+	$$ws->write_string($row_start,$col_start,'Events',$fmt->{title});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'',$fmt->{title});
+	$$ws->write_string($row_start,$col_start+1,'Service Type',$fmt->{title});
 
-
-	if(ref($self->{CONVS}{POPULARITY}{traffic_types}) eq 'ARRAY'){
-		@types = $self->{CONVS}{POPULARITY}{traffic_types};
-		my $type_row_1 = $row_start;
+	if(my @types = @$PopTypes){
+		my $type_row_1 = $row_start + 1;
 		foreach my $type (@types){
 			printf("TYPE: (%s)\n",$type);
-			$ws->write_number(++$type_row_1,$col_start,$self->{CONVS}{GROUPED}{traffic_types}{$type});
-			$ws->write_string($type_row_1,$col_start+1,$type);
-
+			$$ws->write_number($type_row_1,$col_start,$GrpTypes->{$type});
+			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+3,'',$fmt->{normal});
+			$$ws->write_string($type_row_1,$col_start+1,$type);
+			$type_row_1++;
 		}
 	}
 
+	return;
+}
 
-#	if(ref($self->{CONVS}{POPULARITY}{traffic_types}) eq 'ARRAY'){
-#		@destinations = $self->{CONVS}{POPULARITY}{destinations};
-#	}
+# +
+# +  insert traffic destinations 
+# +
+sub _insert_traffic_data_destinations {
+	my($self,$ws,$row_start,$col_start,$col_end) = @_;
+printf("rs:%d\tcs:%d\tce:%s\n",$row_start,$col_start,$col_end);
+
+	my $PopDests  = $self->{'CONVS'}{'POPULARITY'}{'destinations'};
+	my $GrpDests  = $self->{'CONVS'}{'GROUPED'}{'destinations'};
+	
+	my @ips = ();
+	my @destinations = ();
+
+	# add the titles
+	$$ws->write_string($row_start,$col_start,'IP Events',$fmt->{title});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+2,'',$fmt->{title});
+	$$ws->write_string($row_start,$col_start+1,'Remote IP Address',$fmt->{title});
+
+	if(my @ips = @$PopDests){
+		my $type_row_1 = $row_start + 1;
+		foreach my $ip (@ips){
+			printf("IP: (%s)\n",$ip);
+			$$ws->write_number($type_row_1,$col_start,$GrpDests->{$ip});
+			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+2,'',$fmt->{normal});
+			$$ws->write_string($type_row_1,$col_start+1,$ip);
+			# add GeoLocation awesomeness
+			$type_row_1++;
+		}
+	}
 
 	return;
 }
+
+
+
+
 
 # +
 # +  Process the Conversations
@@ -168,35 +199,35 @@ sub _insert_traffic_data {
 sub _process_conversations {
 	my($self) = @_;
 
-	my @conversations;
-	my $conversation_ct = scalar(keys %{$self->{REPORT}{SYN}});  # count of conversation records
+	my @conversations = ();
+	my $conversation_ct = scalar(keys %{$self->{'REPORT'}{'SYN'}});  # count of conversation records
 	my $traffic_types   = {}; # hash of different traffic types
 	my $destinations    = {}; # hash of different traffic destinations
 
 	foreach(my $ix=0;$ix < $conversation_ct;$ix++){
-		my $rec = $self->{REPORT}{SYN}{$ix};
+		my $rec = $self->{'REPORT'}{'SYN'}{$ix};
 		push(@conversations,$rec);  # put into the time sequence list
 		$traffic_types->{$rec->{service}}++;
 		$destinations->{$rec->{dest_ip}}++;
-		printf("[%06d]  %s => %s  --  %s \n",$ix,$rec->{src_ip},$rec->{dest_ip},$rec->{service}||'');
+#printf("[%06d]  %s => %s  --  %s \n",$ix,$rec->{src_ip},$rec->{dest_ip},$rec->{service}||'');
 	}
 
 	return $self->{CONVS} = {  
-		COUNTS => { 
-			conversations => scalar(@conversations),
-			traffic_types => scalar(keys %{$traffic_types}),
-			destinations  => scalar(keys %{$destinations}),
+		'COUNTS' => { 
+			'conversations' => scalar(@conversations),
+			'traffic_types' => scalar(keys %{$traffic_types}),
+			'destinations'  => scalar(keys %{$destinations}),
 		},
-		POPULARITY   => {
-			traffic_types => _popularity($traffic_types),
-			destinations  => _popularity($destinations),
+		'POPULARITY'   => {
+			'traffic_types' => _popularity($traffic_types),
+			'destinations'  => _popularity($destinations),
 		},
-		GROUPED  => {
-			traffic_types => $traffic_types,
-			destinations  => $destinations,
+		'GROUPED'  => {
+			'traffic_types' => $traffic_types,
+			'destinations'  => $destinations,
 
 		},
-		ORDERED => @conversations,
+		'ORDERED' => \@conversations,
 	};
 }
 
@@ -205,8 +236,13 @@ sub _process_conversations {
 # +
 sub _popularity {
 	my($data) = @_;
-
-	return sort { $data->{$b} <=> $data->{$a} } keys(%$data);
+	my @sorted;
+	
+	# perform the sort in scending order
+	foreach my $proto (sort { $data->{$b} <=> $data->{$a} } keys %$data) {
+		push @sorted,$proto;
+	}
+	return \@sorted; 
 }
 
 # +
