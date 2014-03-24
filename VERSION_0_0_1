@@ -13,5 +13,7 @@
 23-MAR-2014 --  VERSION 0.0.1.b
  * add Port communications profiling to the query, 
    this could net some interesting results!!
+ * add reference to PortService to Xlsx::Analysis
+ * updated .gitignore profile
 + - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
