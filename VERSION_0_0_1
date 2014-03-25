@@ -24,4 +24,14 @@
    IPs involved by the app.
  * 
 + - - - - - - - - - - - - - - - - - - - - - - - - - - 
+25-MAR-2014 --  VERSION 0.0.1.d
+ * added a Proof of Concept for using BING to 
+   perform some translation, using PERL as the lang
+   instead of PHP. Some of the idioms in PERL are more
+   furstrating to use, PHP is fairly well dumbed-down
+ * removed some php code that been accidentatlly left
+   in my POC directory
+ * further improvements on the Conversations Parser,
+
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
