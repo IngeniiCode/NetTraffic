@@ -18,4 +18,10 @@
  * added a prototype conversation analysis script as
    reference material for Conversation module
 + - - - - - - - - - - - - - - - - - - - - - - - - - - 
+24-MAR-2014 --  VERSION 0.0.1.c
+ * sorted out bug and completed the conversation 
+   first analysis and display of common Hostnames and
+   IPs involved by the app.
+ * 
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
 

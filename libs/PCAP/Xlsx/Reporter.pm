@@ -58,7 +58,8 @@ sub write_report {
 printf("CONVS %s\n",Dumper $self->{CONVS});
 
 	# Write the report information
-	$self->_summary();	
+	$self->_summary();
+	$self->_conversations_general();
 	#$self->_media();
 	#$self->_dns();
 	#$self->_traffic_ip();
@@ -100,13 +101,8 @@ sub _summary {
 	$sum_ws->write_string(2,0,sprintf(' %d   Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
 
 	# Groupings
-	$sum_ws->merge_range(4,0,4,4,'',$fmt->{sub_sect});
-	$sum_ws->write_string(4,0,'Types of Communication Detected',$fmt->{sub_sect});
-	$self->_insert_traffic_data_types(\$sum_ws,5,0,7);  # send worksheet, and starting co-ordinate and columns
-
-	$sum_ws->merge_range(4,6,4,10,'',$fmt->{sub_sect});
-	$sum_ws->write_string(4,6,'Remote Server IPs',$fmt->{sub_sect});
-	$self->_insert_traffic_data_destinations(\$sum_ws,5,6,10);  # send worksheet, and starting co-ordinate and columns
+	$self->_insert_traffic_data_types(\$sum_ws,4,0,7);  # send worksheet, and starting co-ordinate and columns
+	$self->_insert_traffic_data_destinations(\$sum_ws,4,6,10);  # send worksheet, and starting co-ordinate and columns
 
 	return;
 
@@ -126,6 +122,67 @@ sub _summary {
 }
 
 # +
+# +  Conversations
+# + 
+# + 	SAMPLE FIELDS
+# + - - - - - - - - - - - - - - - - - - 
+# +  'index' => 86,
+# +  'host' => 'csi.gstatic.com',
+# +  'Content-Type' => 'image/gif',
+# +  'url' => 'http://csi.gstatic.com/csi?v=3&s=gmob&action=&rt=crf.39,cri.81',
+# +  'dest_port' => 80,
+# +  'bytes' => 2748,
+# +  'dest_ip' => '188.40.69.72',
+# +  'src_ip' => '192.168.2.6',
+# +  'trans_data' => '',
+# +  'proto' => 'tcp',
+# +  'src_port' => 49848,
+# +  'flags' => 2,
+# +  'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Mobile/11B554a',
+# +  'service' => 'World Wide Web HTTP',
+# +  'uri' => '/csi?v=3&s=gmob&action=&rt=crf.39,cri.81',
+# +  'Accept-Encoding' => 'gzip, deflate',
+# +  'parts' => 6,
+# +  'action' => 'GET'
+# +  
+sub _conversations_general {
+	my ($self) = @_;
+
+	my $ws  = $self->{WB}->add_worksheet( 'Conversations' );
+
+	$ws->set_tab_color( 'orange' );
+
+	# Add header
+	$ws->merge_range(0,0,0,14,'',$fmt->{header});
+	$ws->write_string(0,0,sprintf('Network Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+
+	# Conversation Information
+	$ws->merge_range(2,0,2,14,'',$fmt->{section});
+	$ws->write_string(2,0,sprintf(' %d  Network Conversations',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
+
+	# Add Row Headings
+	$ws->write_number(3,0,'Index',$fmt->{title});
+	$ws->write_string(3,1,'Hostname',$fmt->{title});
+	$ws->write_string(3,2,'IP Address',$fmt->{title});
+	$ws->write_number(3,3,'Port',$fmt->{title});
+	$ws->write_string(3,4,'Service',$fmt->{title});
+	$ws->write_string(3,5,'Content Type',$fmt->{title});
+	$ws->write_string(3,0,$item,$fmt->{title});
+	$ws->write_string(3,0,$item,$fmt->{title});
+	$ws->write_string(3,0,$item,$fmt->{title});
+	$ws->write_string(3,0,$item,$fmt->{title});
+
+	# Start to loop through the items
+	foreach $conv (@$self->{CONVS}{ORDERED}){
+		# process each element
+
+
+	}
+
+	return;
+}
+
+# +
 # +  insert traffic types
 # +
 sub _insert_traffic_data_types {
@@ -136,16 +193,22 @@ sub _insert_traffic_data_types {
 	
 	my @types = ();
 	my @destinations = ();
+	my $total_types = scalar(@$PopTypes);
+	my $top = ($total_types <= 10) ? $total_types : 10;
+	my $title = sprintf('Top %d of %d Communication Methods',$top,$total_types);
+
+	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+4,'',$fmt->{sub_sect});
+	$$ws->write_string($row_start,$col_start,$title,$fmt->{sub_sect});
 
 	# add the titles
-	$$ws->write_string($row_start,$col_start,'Events',$fmt->{title});
+	$$ws->write_string(++$row_start,$col_start,'Events',$fmt->{title});
 	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'',$fmt->{title});
 	$$ws->write_string($row_start,$col_start+1,'Service Type',$fmt->{title});
 
 	if(my @types = @$PopTypes){
 		my $type_row_1 = $row_start + 1;
-		foreach my $type (@types){
-			printf("TYPE: (%s)\n",$type);
+		for(my $i=0;$i<$top;$i++){
+			my $type = shift(@types);
 			$$ws->write_number($type_row_1,$col_start,$GrpTypes->{$type});
 			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+3,'',$fmt->{normal});
 			$$ws->write_string($type_row_1,$col_start+1,$type);
@@ -161,23 +224,28 @@ sub _insert_traffic_data_types {
 # +
 sub _insert_traffic_data_destinations {
 	my($self,$ws,$row_start,$col_start,$col_end) = @_;
-printf("rs:%d\tcs:%d\tce:%s\n",$row_start,$col_start,$col_end);
 
 	my $PopDests  = $self->{'CONVS'}{'POPULARITY'}{'destinations'};
 	my $GrpDests  = $self->{'CONVS'}{'GROUPED'}{'destinations'};
 	
 	my @ips = ();
 	my @destinations = ();
+	my $total_types = scalar(@$PopDests);
+	my $top = ($total_types <= 10) ? $total_types : 10;
+	my $title = sprintf('Top %d of %d Frequent IPs Contacted',$top,$total_types);
 
+	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+4,'',$fmt->{sub_sect});
+	$$ws->write_string($row_start,$col_start,$title,$fmt->{sub_sect});
+	
 	# add the titles
-	$$ws->write_string($row_start,$col_start,'IP Events',$fmt->{title});
+	$$ws->write_string(++$row_start,$col_start,'IP Events',$fmt->{title});
 	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+2,'',$fmt->{title});
 	$$ws->write_string($row_start,$col_start+1,'Remote IP Address',$fmt->{title});
 
 	if(my @ips = @$PopDests){
 		my $type_row_1 = $row_start + 1;
-		foreach my $ip (@ips){
-			printf("IP: (%s)\n",$ip);
+		for(my $i=0;$i<$top;$i++){
+			my $ip = shift(@ips);
 			$$ws->write_number($type_row_1,$col_start,$GrpDests->{$ip});
 			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+2,'',$fmt->{normal});
 			$$ws->write_string($type_row_1,$col_start+1,$ip);
@@ -189,10 +257,6 @@ printf("rs:%d\tcs:%d\tce:%s\n",$row_start,$col_start,$col_end);
 	return;
 }
 
-
-
-
-
 # +
 # +  Process the Conversations
 # +
@@ -200,12 +264,12 @@ sub _process_conversations {
 	my($self) = @_;
 
 	my @conversations = ();
-	my $conversation_ct = scalar(keys %{$self->{'REPORT'}{'SYN'}});  # count of conversation records
+	my $conversation_ct = scalar(keys %{$self->{'REPORT'}});  # count of conversation records
 	my $traffic_types   = {}; # hash of different traffic types
 	my $destinations    = {}; # hash of different traffic destinations
 
 	foreach(my $ix=0;$ix < $conversation_ct;$ix++){
-		my $rec = $self->{'REPORT'}{'SYN'}{$ix};
+		my $rec = $self->{'REPORT'}{$ix};
 		push(@conversations,$rec);  # put into the time sequence list
 		$traffic_types->{$rec->{service}}++;
 		$destinations->{$rec->{dest_ip}}++;

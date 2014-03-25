@@ -8,11 +8,15 @@ use strict;
 # =============================
 use Net::Pcap;
 use Net::DNS::Packet;
-use NetPacket::Ethernet;
-use NetPacket::IP;
-use NetPacket::TCP;
-use NetPacket::UDP;
+use NetPacket::Ethernet qw(:ALL);
+use NetPacket::IP qw(:ALL);
+use NetPacket::TCP qw(:ALL);
+use NetPacket::UDP qw(:ALL);
 use Pcap::PortService; 
+# - - - used for encoding issues - - -
+use utf8;
+use Text::Unidecode;
+# - - - implimen a SWITCH for PERL - - -
 use Switch;
 # - - - - - - - - - - - - - - 
 use Data::Dumper;  # for debugging
@@ -88,18 +92,17 @@ sub process_file {
 sub _process_conversations {
 	my($self) = @_;
 
-printf("%s\n",uc((caller(0))[3]));
-
-	foreach my $cIndex (keys %{$self->{'CONV'}{SYN}}){
+	foreach my $cIndex (keys %{$self->{'CONV'}}){
 		my $filter;
 		my $filter_c;  # hold the compiled filter
 		printf("IDX: %06d\n",$cIndex); 
-		my $C = $self->{'CONV'}{SYN}{$cIndex};  # localize this thing
+		my $C = $self->{'CONV'}{$cIndex};  # localize this thing
 		# Build a filter based on this conversations knows
 		# read entire conversation
 		# construct a filter
 		$filter = sprintf('tcp and (host %s and host %s) and (port %d and port %d)',$C->{src_ip},$C->{dest_ip},$C->{src_port},$C->{dest_port});
-printf("FILTER: %s\n",$filter);
+		$filter = sprintf('(host %s and host %s) and (port %d and port %d)',$C->{src_ip},$C->{dest_ip},$C->{src_port},$C->{dest_port});
+printf("====== FILTER: %s ========\n",$filter);
 		$self->_assemble_conversation($cIndex,$filter);
 	
 	}
@@ -114,8 +117,6 @@ sub _loop {
 	# -- beware of locals
 	my $filter_c;  # holder for compiled filter
 	my $fname = sprintf('_proc_%s',$proto||'tcp');
-
-printf("%s('%s');\n",uc((caller(0))[3]),$proto);
 
        	# init the pcap file for processing. 
         $self->_init_pcap();  # not required to set if already set
@@ -137,7 +138,6 @@ printf("%s('%s');\n",uc((caller(0))[3]),$proto);
 
 	return;
 }
-
 	
 # +
 # +   Packet Processing
@@ -146,8 +146,6 @@ sub _assemble_conversation {
 	my($self,$cIndex,$filter) = @_;
 	# -- beware of locals
 	my $filter_c;  # holder for compiled filter
-
-printf("%s('%s','%s');\n",uc((caller(0))[3]),$cIndex,$filter);
 
        	# init the pcap file for processing. 
         $self->_init_pcap();  # not required to set if already set
@@ -164,8 +162,6 @@ printf("%s('%s','%s');\n",uc((caller(0))[3]),$cIndex,$filter);
 
 	# close the network file (since we have finished our processing)
 	Net::Pcap::close( $self->{PCAP} );
-
-	exit;  # TEMPORARY DEBUGGING STRATEGY
 
 	return;
 }
@@ -209,7 +205,8 @@ sub _proc_syn_only {
 	$idx = $self->{conversation_index}++;
 
 	# record the conversation
-	$self->{'CONV'}{SYN}{$idx} = {
+	$self->{'CONV'}{$idx} = {
+		'parts'     => 0,
 		'index'     => $idx,
 		'proto'     => $lproto,  
 		'src_ip'    => $ip_pac->{'src_ip'},
@@ -217,20 +214,19 @@ sub _proc_syn_only {
 		'dest_ip'   => $ip_pac->{'dest_ip'},
 		'dest_port' => $trans->{'dest_port'},
 		'flags'     => $trans->{'flags'},
-		'hostname'  => '',
 	};
 
 	# figure out a service
 	if(my $srvc = $PORTS->get_info($trans->{'dest_port'},$lproto)){
-		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'}; 
+		$self->{'CONV'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'}; 
 	}
 	elsif (my $srvc = $PORTS->get_info($trans->{'src_port'},$lproto)) {
-		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'};
+		$self->{'CONV'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'};
 	}
 
 	if($trans->{'src_port'} == 53 || $trans->{'dest_port'} == 53) {
 		# DNS!
-		$self->{'CONV'}{'SYN'}{$idx}{dns} = $self->_Net_DNS_Packet($trans);	
+		$self->{'CONV'}{$idx}{dns} = $self->_Net_DNS_Packet($trans);	
 	}
 
 	return;
@@ -240,143 +236,87 @@ sub _proc_syn_only {
 # +  process the SYN Packets
 # +
 sub _read_all_matching {
-	my ($self,$cIndex,$header,$pack) = @_;
+	my ($user,$header,$pack) = @_;
 	# -- beware of locals
+	my ($self,$cIndex) = @$user;  # deconstruct
         my $fcheck;
         my $input;
 	my $eth_pac;
+	my $eth_type;
 	my $ip_pac;
 	my $trans;
 	my $lproto;
 	my $service;
-	my $idx;  # index counter
-
-printf("%s('%s',%d,'%s','%s');\n",uc((caller(0))[3]),$self,$cIndex,$header,$pack);
-	return;
+	my $httpd;
 
 	# Ethernet Packet processing 
 	$eth_pac  = NetPacket::Ethernet->decode( $pack );  # set ethernet packet 
+#	$self->{'CONV'}{$cIndex}{eth_data} = $eth_pac->{data};
+
+	$eth_type = _decode_eth($eth_pac);
+#	$self->{'CONV'}{$cIndex}{eth_type}{$eth_type}++;
 
 	# IP Packet processing
 	$ip_pac   = NetPacket::IP->decode( $eth_pac->{'data'} );  # 
+#	$self->{'CONV'}{$cIndex}{ip_data} = $ip_pac->{data};
+
+	# Add size to set
+	$self->{'CONV'}{$cIndex}{bytes} += ($ip_pac->{len} - $ip_pac->{hlen}) || 0;
 
 	switch ($ip_pac->{'proto'}) {
-		case   6    {  $lproto = 'tcp';  $trans = NetPacket::TCP->decode( $ip_pac->{'data'} );  }
-		case  17    {  $lproto = 'upd';  $trans = NetPacket::UDP->decode( $ip_pac->{'data'} );  }
+		case   6    {  
+			$lproto = 'tcp';  
+			$trans = NetPacket::TCP->decode($ip_pac->{'data'});  
+			}
+		case  17    {  
+			$lproto = 'upd';  
+			$trans = NetPacket::UDP->decode($ip_pac->{'data'});  
+			}
+		else {  printf("UNKNOWN TYPE: %d\n",$ip_pac->{'proto'}); }
 	};
 
 	# Define a bitmask for SYN packets
 	$fcheck = $trans->{'flags'} & 0x3f;
 
+	$self->{'CONV'}{$cIndex}{trans_data} = $trans->{data};
 
-	# record the conversation
-	$self->{'CONV'}{SYN}{$idx} = {
-		'index'     => $idx,
-		'proto'     => $lproto,  
-		'src_ip'    => $ip_pac->{'src_ip'},
-		'src_port'  => $trans->{'src_port'},
-		'dest_ip'   => $ip_pac->{'dest_ip'},
-		'dest_port' => $trans->{'dest_port'},
-		'flags'     => $trans->{'flags'},
-		'hostname'  => '',
-	};
+	# RETURN if this looks like a SYN package proto, we're already processed it.
+	return if $fcheck == 0x02;
 
-	# figure out a service
-	if(my $srvc = $PORTS->get_info($trans->{'dest_port'},$lproto)){
-		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'}; 
+	# increment the number of parts in this conversation
+	$self->{'CONV'}{$cIndex}{parts}++;
+
+	# RETURN unless this is some type of IP 
+	return unless $eth_type eq 'IP'; 
+
+	# Try to HTTP parse everything.. to heck with it!!!
+	$httpd = _http('http',$trans);
+
+#	# Check to see if it looks like Web traffic
+#	switch ($trans->{'dest_port'}) {
+#		case 	80   {
+#			# HTTP
+#			$httpd = _http('http',$trans);
+#			}
+#		case   443   {
+#			# HTTPS
+#			$httpd = _http('https',$trans);
+#			}
+#		
+#	};
+
+	if($httpd) {
+		# attempt to integrat this into the conversation block
+		foreach my $key (keys %$httpd) {
+			$self->{'CONV'}{$cIndex}{$key} ||= $httpd->{$key} || '';  # set if not yet set.
+		}
 	}
-	elsif (my $srvc = $PORTS->get_info($trans->{'src_port'},$lproto)) {
-		$self->{'CONV'}{'SYN'}{$idx}{'service'} = $srvc->{'description'} || $srvc->{'service'};
-	}
+
+	# send off some stuff to the DNS parser if it looks like DNS traffic
 
 	if($trans->{'src_port'} == 53 || $trans->{'dest_port'} == 53) {
 		# DNS!
-		$self->{'CONV'}{'SYN'}{$idx}{dns} = $self->_Net_DNS_Packet($trans);	
-	}
-
-	return;
-}
-
-
-# +
-# +  process the UDP Packets
-# +
-sub _proc_udp {
-	my ($self,$header,$pack) = @_;
-	# -- beware of locals
-        my $fcheck;
-        my $input;
-	my $eth_pac;
-	my $ip_pac;
-	my $udp_pac;
-	my $idx = $self->{conversation_index}++;
-
-	# Ethernet Packet processing 
-	$eth_pac  = NetPacket::Ethernet->decode( $pack );  # set ethernet packet 
-
-	# IP Packet processing
-	$ip_pac   = NetPacket::IP->decode( $eth_pac->{'data'} );  # 
-
-	# UDP Packet processing
-	$udp_pac  = NetPacket::UDP->decode( $ip_pac->{'data'} );
-
-	# record the conversation
-	$self->{'CONV'}{'UDP'}{$idx} = {
-		'src_ip'    => $ip_pac->{'src_ip'},
-		'src_port'  => $udp_pac->{'src_port'},
-		'src_srvc'  => $PORTS->get_info($udp_pac->{'src_port'},'udp'), 
-		'dest_ip'   => $ip_pac->{'dest_ip'},
-		'dest_port' => $udp_pac->{'dest_port'},
-		'dest_srvc' => $PORTS->get_info($udp_pac->{'dest_port'},'udp'),
-		'flags'     => $udp_pac->{'flags'},
-		'hostname'  => '',
-	};
-
-	if($udp_pac->{'src_port'} == 53 || $udp_pac->{'dest_port'} == 53) {
-		# DNS!
-		$self->{'CONV'}{'UDP'}{$idx}{dns} = $self->_Net_DNS_Packet($udp_pac);	
-	}
-
-	return;
-}
-
-# +
-# +  process the TCP Packets
-# +
-sub _proc_tcp {
-	my ($self,$header,$pack) = @_;
-	# -- beware of locals
-        my $fcheck;
-        my $input;
-	my $eth_pac;
-	my $ip_pac;
-	my $tcp_pac;
-	my $idx = $self->{conversation_index}++;
-
-	# Ethernet Packet processing 
-	$eth_pac  = NetPacket::Ethernet->decode( $pack );  # set ethernet packet 
-
-	# IP Packet processing
-	$ip_pac   = NetPacket::IP->decode( $eth_pac->{'data'} );  # 
-
-	# UDP Packet processing
-	$tcp_pac  = NetPacket::TCP->decode( $ip_pac->{'data'} );
-
-	# record the conversation
-	$self->{'CONV'}{'TCP'}{$idx} = {
-		'src_ip'    => $ip_pac->{'src_ip'},
-		'src_port'  => $tcp_pac->{'src_port'},
-		'src_srvc'  => $PORTS->get_info($tcp_pac->{'src_port'},'tcp'), 
-		'dest_ip'   => $ip_pac->{'dest_ip'},
-		'dest_port' => $tcp_pac->{'dest_port'},
-		'dest_srvc' => $PORTS->get_info($tcp_pac->{'dest_port'},'tcp'),
-		'flags'     => $tcp_pac->{'flags'},
-		'hostname'  => '',
-	};
-
-	if($tcp_pac->{'src_port'} == 53 || $tcp_pac->{'dest_port'} == 53) {
-		# DNS!
-		$self->{'CONV'}{'TCP'}{$idx}{dns} = $self->_Net_DNS_Packet($tcp_pac);	
+		$self->{'CONV'}{$cIndex}{dns} = $self->_Net_DNS_Packet($trans);	
 	}
 
 	return;
@@ -388,20 +328,16 @@ sub _proc_tcp {
 sub _Net_DNS_Packet {
 	my ($self,$dns_pac) = @_;
 	my $dns = Net::DNS::Packet->new(\$dns_pac);
-#printf("DNS: %s\n",Dumper $dns);
 
 	# Decode the DNS
 	my $header   = $dns->header;
 	my @question = $dns->question;
 	my @answer   = $dns->answer;
 
-#printf("%s\n%s\n%s\n",$header,Dumper @question,@answer);
-
 	for my $ans (@answer) {
 		if($ans->string =~ /([a-z0-9\._-]+)\.\t.*\tIN\tA\t(\d+\.\d+\.\d+\.\d+)$/i){
 			my $hostname = $1;
 			my $ip       = $2;
-#printf("DNS: %s -> %s\n",$hostname,$ip);
 			# set to DNS lookup
 		}
 	}
@@ -409,9 +345,67 @@ sub _Net_DNS_Packet {
 	return;
 }
 
+# +
+# +  HTTP Packet Processing
+# +
+sub _http {
+	my ($prefix,$trans) = @_;
+	# -- beware of locals
+	my $checked = 0;
+	my @items;
+	my $HTTPD;  # storage of stuffs found
+
+	#return unless @items = split (/\n|\r\n|\r/,unidecode($trans->{data}));
+	return unless @items = split (/\n|\r\n|\r/,$trans->{data});
+
+	foreach my $item (@items) {
+#printf("ITEM: %s\n",unidecode($item));
+		if($item =~ /^GET\s+(.*)\s+HTTP\/1/) {
+				$HTTPD->{action} = 'GET';
+				$HTTPD->{uri}    = $1;
+		}
+		if($item =~ /^POST\s+(.*)\s+HTTP\/1/) {
+				$HTTPD->{action} = 'POST';
+				$HTTPD->{uri}    = $1;
+		}
+		if($item =~ /^Location:\s+(.*)\s+HTTP\/1/i) {
+				$HTTPD->{action} = 'GET';
+				$HTTPD->{url} = $1; 
+		}
+		if($item =~ /^Host:\s+(.*)/) {
+				$HTTPD->{host} = _trim_hostname($1);
+		}
+		if($item =~ /Content-Type:\s+(.*)/i) {
+				$HTTPD->{'Content-Type'} = $1;
+		}
+		if($item =~ /Accept-Encoding:\s+(.*)/i) {
+				$HTTPD->{'Accept-Encoding'} = $1;
+		}
+		if($item =~ /Content-Encoding:\s+(.*)/i) {
+				$HTTPD->{'Content-Encoding'} = $1;
+		}
+		if($item =~ /Content-Disposition:\s+(.*)/i) {
+				$HTTPD->{'Content-Disposition'} = $1;
+		}
+		if($item =~ /User-Agent:\s+(.*)/) {
+				$HTTPD->{'User-Agent'} = $1;
+		}
+
+		last if ++$checked > 15;  # prevent some insane infinate loop
+	}
+
+	# Complete the assmblies
+        # Get/Set host if not set
+        #$host    = _get_ip_host($ip);
+        $HTTPD->{url}  = sprintf('%s://%s%s',$prefix,$HTTPD->{host},$HTTPD->{uri}) if $HTTPD->{host}; 
+        #$type    = _guess_type($uri);
+
+	return $HTTPD;
+}
+
 
 # +
-# +  initialize the pcap handle, with passed infile name.
+# +  initialize the pcap handle, with passed infile name
 # +  function force overrides the any setting in $self->{infile} 
 # +
 sub _init_pcap {
@@ -427,6 +421,37 @@ sub _init_pcap {
 }
 
 # +
+# +   translate the ethernet protocol mask to human readable knowledge
+# +
+sub _decode_eth {
+	my($eth_pac) = @_;
+
+        switch( $eth_pac->{type} ) {
+                case ETH_TYPE_IP        { return 'IP'; }
+                case ETH_TYPE_ARP       { return 'ARP'; }
+                case ETH_TYPE_APPLETALK { return 'APPLETALK'; }
+                case ETH_TYPE_SNMP      { return 'SNMP'; }
+                case ETH_TYPE_IPv6      { return 'IPv6'; }
+                case ETH_TYPE_PPP       { return 'PPP'; }
+                else                    { return 'other'; }
+        }
+
+	return undef;
+}
+
+# +
+# +  trim hostname
+# +
+sub _trim_hostname {
+	my ($hostname) = @_;
+	chomp($hostname);
+
+	if($hostname =~ /([a-z0-9\-_\.]+):.*/i){
+		return $1;
+	}
+	return $hostname;
+}
+
 
 1; 
 
