@@ -7,6 +7,7 @@ use Socket;
 use Excel::Writer::XLSX;
 use PCAP::GeoLocate;
 use PCAP::Whois;
+use PCAP::ContentType;
 use File::Basename;
 use Data::Dumper;
 # - - - - - - - - - - - - - - - 
@@ -59,8 +60,9 @@ printf("CONVS %s\n",Dumper $self->{CONVS});
 
 	# Write the report information
 	$self->_summary();
+	$self->_conversations_media();
+	$self->_conversations_payload();
 	$self->_conversations_general();
-	#$self->_media();
 	$self->_add_dns();
 	#$self->_traffic_ip();
 	#$self->_traffic_host();
@@ -153,11 +155,11 @@ sub _conversations_general {
 	$ws->set_tab_color( 'orange' );
 
         # Set column widths
-       $ws->set_column(0,0,6);
-       $ws->set_column(1,1,16);
-       $ws->set_column(2,3,25);
-       $ws->set_column(4,5,75);
-       $ws->set_column(6,7,2);
+	$ws->set_column(0,0,6);
+	$ws->set_column(1,1,16);
+	$ws->set_column(2,3,25);
+	$ws->set_column(4,5,75);
+	$ws->set_column(6,7,2);
 
 	# Add header
 	$ws->merge_range(0,0,0,7,'',$fmt->{header});
@@ -183,6 +185,98 @@ sub _conversations_general {
 
 	return;
 }
+
+# +
+# +   Traffic with a content type the indicates it's likely to be media
+# +
+sub _conversations_media {
+	my ($self) = @_;
+	my @convs = @{$self->{CONVS}{MEDIA}};  # localize array, just because 
+	return unless scalar(@convs);
+
+	my $ws  = $self->{WB}->add_worksheet( 'Media' );
+	my $current_row = 4;  # row to start inserting the conversation blocks
+
+	$ws->set_tab_color( 'red' );
+
+        # Set column widths
+	$ws->set_column(0,0,6);
+	$ws->set_column(1,1,16);
+	$ws->set_column(2,3,25);
+	$ws->set_column(4,5,75);
+	$ws->set_column(6,7,2);
+
+	# Add header
+	$ws->merge_range(0,0,0,7,'',$fmt->{header});
+	$ws->write_string(0,0,sprintf('Audio / Video Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+
+	# Conversation Information
+	$ws->merge_range(2,0,2,7,'',$fmt->{section});
+	$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section});
+
+	# Top Row Headings
+	$ws->write_string(3,0,'Convrs.',$fmt->{title});
+	$ws->write_string(3,1,'IP Address',$fmt->{title});
+	$ws->write_string(3,2,'Hostname',$fmt->{title});
+	$ws->write_string(3,3,'Content-Type',$fmt->{title});
+	$ws->merge_range(3,4,3,5,'',$fmt->{title});
+	$ws->write_string(3,4,'URL',$fmt->{title});
+
+	# Start to loop through the items
+	foreach my $conv (@convs){
+		# process each element
+		$current_row += $self->_add_conversation(\$ws,$current_row,$conv);  # add to worksheet and return how much space it used
+	}
+
+	return;
+}
+
+# +
+# +   Traffic with a content type the indicates it's likely to be media
+# +
+sub _conversations_payload {
+	my ($self) = @_;
+	my @convs = @{$self->{CONVS}{PAYLOAD}};  # localize array, just because 
+	return unless scalar(@convs);
+
+	my $ws  = $self->{WB}->add_worksheet( 'Payloads' );
+	my $current_row = 4;  # row to start inserting the conversation blocks
+
+	$ws->set_tab_color( 'red' );
+
+        # Set column widths
+	$ws->set_column(0,0,6);
+	$ws->set_column(1,1,16);
+	$ws->set_column(2,3,25);
+	$ws->set_column(4,5,75);
+	$ws->set_column(6,7,2);
+
+	# Add header
+	$ws->merge_range(0,0,0,7,'',$fmt->{header});
+	$ws->write_string(0,0,sprintf('Payload Typical Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+
+	# Conversation Information
+	$ws->merge_range(2,0,2,7,'',$fmt->{section});
+	#$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section});
+	$ws->write_string(2,0,'Discovered Payloads',$fmt->{section});
+
+	# Top Row Headings
+	$ws->write_string(3,0,'Convrs.',$fmt->{title});
+	$ws->write_string(3,1,'IP Address',$fmt->{title});
+	$ws->write_string(3,2,'Hostname',$fmt->{title});
+	$ws->write_string(3,3,'Content-Type',$fmt->{title});
+	$ws->merge_range(3,4,3,5,'',$fmt->{title});
+	$ws->write_string(3,4,'URL',$fmt->{title});
+
+	# Start to loop through the items
+	foreach my $conv (@convs){
+		# process each element
+		$current_row += $self->_add_conversation_payload(\$ws,$current_row,$conv);  # add to worksheet and return how much space it used
+	}
+
+	return;
+}
+
 
 # +
 # +  insert traffic types
@@ -301,7 +395,6 @@ sub _add_conversation($ws,$current_row,$conv) {
 
 	# RULE, no URL, no show
 	return 0 unless $conv->{'url'};
-#printf("\$ws = %s\n\$row=%s\n\$conv=%s\n",$ws,$row,$conv);
 
 	my $ru = 0;  # rows used.
 
@@ -354,6 +447,72 @@ sub _add_conversation($ws,$current_row,$conv) {
 	$$ws->merge_range($row+2,5,$row+$ru,5,$ip_geoloc,$fmt->{whois});  # Index Cell.
 	$$ws->merge_range($row,0,$row+$ru,0,$conv->{index},$fmt->{conversation_index});    # Index Cell.
 	$$ws->merge_range($row+$ru,1,$row+$ru,3,'',$fmt->{normal});    # Index Cell.
+
+	$ru++;  #last row
+	$$ws->merge_range($row,6,$row+$ru-1,7,'',$fmt->{conversation_right_frame});    # Right Cell.
+	$$ws->merge_range($row+$ru,0,$row+$ru,7,'',$fmt->{conversation_footer});    # Footer Cell.
+
+	return $ru+1;
+}
+
+# +
+# +
+# +  Create and add the Conversation Payload Special 
+# +
+sub _add_conversation_payload($ws,$current_row,$conv) {
+	my($self,$ws,$row,$conv) = @_;
+
+	# RULE, no URL, no show
+	return 0 unless $conv->{'url'};
+	return 0 unless $conv->{'data'};
+
+	my $ru = 0;  # rows used.
+
+	#  Add first row
+	$$ws->write_number($row+$ru,0,$conv->{'index'},$fmt->{conversation_index});
+	$$ws->write_string($row+$ru,1,$conv->{'dest_ip'},$fmt->{conversation});
+	$$ws->write_string($row+$ru,2,$conv->{'host'}||'',$fmt->{conversation});
+	$$ws->write_string($row+$ru,3,$conv->{'Content-Type'}||'',$fmt->{conversation});
+	$$ws->merge_range($row+$ru,4,$row+$ru,5,'',$fmt->{conversation});
+	$$ws->write_string($row+$ru,4,$conv->{'url'},$fmt->{conversation});
+
+	# Add Service Details
+	my $domain  = $conv->{host} || '';
+	my $destip  = sprintf('%s:%s',$conv->{dest_ip},$conv->{dest_port});
+	my $payload = $conv->{data} || '-- no payload extracted --';
+
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Service',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_string($row+$ru,2,$conv->{'service'},$fmt->{normal});
+	$$ws->merge_range($row+$ru,4,$row+$ru,5,'Payload Data',$fmt->{title_lt});
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Action',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_string($row+$ru,2,$conv->{'action'},$fmt->{normal});
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Bytes',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_number($row+$ru,2,$conv->{'bytes'},$fmt->{normal});
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Segments',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_number($row+$ru,2,$conv->{'parts'},$fmt->{normal});
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Agent',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_string($row+$ru,2,$conv->{'User-Agent'},$fmt->{normal});
+	$ru++;  #next row
+	$$ws->write_string($row+$ru,1,'Encoding',$fmt->{title_lt});
+	$$ws->merge_range($row+$ru,2,$row+$ru,3,'',$fmt->{normal});
+	$$ws->write_string($row+$ru,2,$conv->{'Accept-Encoding'},$fmt->{normal});
+	
+	# Setup the cell merges
+	$ru++;  #next row
+	$$ws->merge_range($row+2,4,$row+$ru,5,'',$fmt->{whois});  # Payload Cell.
+	$$ws->write_rich_string($row+2,4,$payload,$fmt->{whois});  # Payload Cell.
+	$$ws->merge_range($row,0,$row+$ru,0,$conv->{index},$fmt->{conversation_index});    # Index Cell.
+	$$ws->merge_range($row+$ru,1,$row+$ru,3,'',$fmt->{normal});    # ??? Cell.
 
 	$ru++;  #last row
 	$$ws->merge_range($row,6,$row+$ru-1,7,'',$fmt->{conversation_right_frame});    # Right Cell.
@@ -425,19 +584,26 @@ sub _add_dns {
 sub _process_conversations {
 	my($self) = @_;
 
-	my @conversations = ();
-	my $conversation_ct = scalar(keys %{$self->{'REPORT'}});  # count of conversation records
+	# + -- lists
+	my @conversations   = ();
+	my @media           = ();
+	my @payloads        = ();
+	# + -- hashes 
 	my $traffic_types   = {}; # hash of different traffic types
 	my $destinations    = {}; # hash of different traffic destinations
 	my $hostnames       = {}; # hash of different hostnames seen
 	my $ip_to_host      = {}; # hash holds a lookup hash of IPs to hostnames
 	my $host_to_ip      = {}; # hash hosts a lookup hash of hostnames to IPs
+	# + -- scalars
+	my $conversation_ct = scalar(keys %{$self->{'REPORT'}});  # count of conversation records
 
 	foreach(my $ix=0;$ix < $conversation_ct;$ix++){
-		my $rec  = $self->{'REPORT'}{$ix};
-		my $ip   = $rec->{dest_ip}; # || _guess_ip($rec->{host});
-		my $host = $rec->{host}; #    || _guess_host($ip);
+		my $rec   = $self->{'REPORT'}{$ix};
+		my $ip    = $rec->{dest_ip}; # || _guess_ip($rec->{host});
+		my $host  = $rec->{host}; #    || _guess_host($ip);
 		push(@conversations,$rec);  # put into the time sequence list
+		push(@media,$rec) if Pcap::ContentType::is_media($rec->{'Content-Type'}||'');
+		push(@payloads,$rec) if Pcap::ContentType::is_payload($rec->{'Content-Type'}||'');
 		$traffic_types->{$rec->{service}}++;
 		$destinations->{$ip}++;
 		$hostnames->{$host}++;
@@ -464,7 +630,9 @@ sub _process_conversations {
 			'ip_to_host'    => $ip_to_host,
 			'host_to_ip'    => $host_to_ip,
 		},
-		'ORDERED' => \@conversations,
+		'ORDERED'   => \@conversations,
+		'MEDIA'     => \@media,
+		'PAYLOAD'   => \@payloads,
 	};
 }
 

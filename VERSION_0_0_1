@@ -46,4 +46,12 @@
    could be useful as a portable integrated component
    of this tool.
 + - - - - - - - - - - - - - - - - - - - - - - - - - - 
+26-MAR-2014 --  VERSION 0.0.1.f
+ * implemented the PAYLOAD collection to Conversation
+   module and display methodology to Reporter.
+ * Adding JSON and XML decoding components to try and 
+   extract the details of the payloads, look for 
+   hostnames, e-mails etc, then collate that data for
+   other purposes / reporting pages.
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
 

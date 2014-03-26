@@ -13,6 +13,7 @@ use NetPacket::IP qw(:ALL);
 use NetPacket::TCP qw(:ALL);
 use NetPacket::UDP qw(:ALL);
 use Pcap::PortService; 
+use Pcap::ContentType;
 # - - - used for encoding issues - - -
 use utf8;
 use Text::Unidecode;
@@ -161,6 +162,9 @@ sub _assemble_conversation {
 	# collect up the hostname and IP from conversation
 	$self->_collect_host_ip($cIndex);
 
+	# process data block
+	$self->_normalize_conversation_data($cIndex);
+
 	# close the network file (since we have finished our processing)
 	Net::Pcap::close( $self->{PCAP} );
 
@@ -299,10 +303,15 @@ sub _read_all_matching {
 	if($httpd) {
 		# attempt to integrat this into the conversation block
 		foreach my $key (keys %$httpd) {
-			$self->{'CONV'}{$cIndex}{$key} ||= $httpd->{$key} || '';  # set if not yet set.
+			if($key eq 'data'){
+				$self->{'CONV'}{$cIndex}{$key} .= $httpd->{$key};  # append
+			}
+			else {
+				$self->{'CONV'}{$cIndex}{$key} ||= $httpd->{$key} || '';  # set if not yet set.
+			}
 		}
 	}
-
+	
 	# send off some stuff to the DNS parser if it looks like DNS traffic
 
 	if($trans->{'src_port'} == 53 || $trans->{'dest_port'} == 53) {
@@ -345,51 +354,102 @@ sub _http {
 	my $checked = 0;
 	my @items;
 	my $HTTPD;  # storage of stuffs found
+	my $buffer = '';
 
-	#return unless @items = split (/\n|\r\n|\r/,unidecode($trans->{data}));
 	return unless @items = split (/\n|\r\n|\r/,$trans->{data});
 
 	foreach my $item (@items) {
-#printf("ITEM: %s\n",unidecode($item));
-		if($item =~ /^GET\s+(.*)\s+HTTP\/1/) {
-				$HTTPD->{action} = 'GET';
-				$HTTPD->{uri}    = $1;
+		if ($item =~ /^GET\s+(.*)\s+HTTP\/1/ )      { 
+			$HTTPD->{action} = 'GET';
+			$HTTPD->{uri}    = $1;
+			next;
 		}
-		if($item =~ /^POST\s+(.*)\s+HTTP\/1/) {
-				$HTTPD->{action} = 'POST';
-				$HTTPD->{uri}    = $1;
+		if ($item =~  /^POST\s+(.*)\s+HTTP\/1/ )      {	
+			$HTTPD->{action} = 'POST';
+			$HTTPD->{uri}    = $1;
+			next;
 		}
-		if($item =~ /^Location:\s+(.*)\s+HTTP\/1/i) {
-				$HTTPD->{action} = 'GET';
-				$HTTPD->{url} = $1; 
+		if ($item =~  /^Location:\s+(.*)\s+HTTP\/1/i )      {
+			$HTTPD->{action} = 'GET';
+			$HTTPD->{url} = $1; 
+			next;
 		}
-		if($item =~ /^Host:\s+(.*)/) {
-				$HTTPD->{host} = _trim_hostname($1);
+		if ($item =~  /^Host:\s+(.*)/ )      {
+			$HTTPD->{host} = _trim_hostname($1);
+			next;
 		}
-		if($item =~ /Content-Type:\s+(.*)/i) {
-				$HTTPD->{'Content-Type'} = $1;
+		if ($item =~  /^Content-Type:\s+(.*)/i )      {
+			$HTTPD->{'Content-Type'} = $1;
+			next;
 		}
-		if($item =~ /Accept-Encoding:\s+(.*)/i) {
-				$HTTPD->{'Accept-Encoding'} = $1;
+		if ($item =~  /^(Content\-.*):\s+(.*)/i )      {
+			$HTTPD->{$1} = $2;
+			next;
 		}
-		if($item =~ /Content-Encoding:\s+(.*)/i) {
-				$HTTPD->{'Content-Encoding'} = $1;
+		if ($item =~  /^Accept-Encoding:\s+(.*)/i )      {
+			$HTTPD->{'Accept-Encoding'} = $1;
+			next;
 		}
-		if($item =~ /Content-Disposition:\s+(.*)/i) {
-				$HTTPD->{'Content-Disposition'} = $1;
+		if ($item =~  /^User-Agent:\s+(.*)/ )      {
+			$HTTPD->{'User-Agent'} = $1;
+			next;
 		}
-		if($item =~ /User-Agent:\s+(.*)/) {
-				$HTTPD->{'User-Agent'} = $1;
+		if ($item =~  /^Server:\s+(.*)/ )      {
+			$HTTPD->{'Server'} = $1;
+			next;
 		}
-
-		last if ++$checked > 15;  # prevent some insane infinate loop
+		if ($item =~  /^Date:\s+(.*GMT)/ )      {
+			$HTTPD->{'Date'} = $1;			
+			next;
+		}
+		if ($item =~  /^Expires:\s+(.*GMT)/ )      {
+			$HTTPD->{'Expires'} = $1;
+			next;
+		}
+		if ($item =~  /^Last-Modified:\s+(.*)/ )      {
+			$HTTPD->{'Last-Modified'} = $1;
+			next;
+		}
+		if ($item =~  /^(Accept.*):\s(.*)/ )      {
+			$HTTPD->{$1} = $2;
+			next;
+		}
+		if ($item =~  /^(X-[a-z0-9\-]+):\s(.*)/i )      {
+			$HTTPD->{$1} = $2;
+			next;
+		}
+		if ($item =~  /^(Pragm[a-z0-9\-]+):\s(.*)/i )      {
+			$HTTPD->{$1} = $2;
+			next;
+		}
+		if ($item =~  /^(Alternate[a-z0-9\-]+):\s(.*)/i )      {
+			$HTTPD->{$1} = $2;
+			next;
+		}
+		if ($item =~  /^Cache-Control:\s.*/ )      {
+			next;
+		}
+		if ($item =~  /^Keep-Alive:\s.*/ )      {
+			next;
+		}
+		if ($item =~  /^Connection:\s+.*/ )      {
+			next;
+		}
+		if ($item =~  /^Status:\// )      {
+			next;
+		}
+		if ($item =~  /^HTTP\// )      {
+			next;
+		}
+		chomp($item); # remove any extraneous crap
+		$HTTPD->{data} .= $item."\n" if $item;
 	}
 
 	# Complete the assmblies
         # Get/Set host if not set
-        #$host    = _get_ip_host($ip);
+        #$host         = _get_ip_host($ip);
         $HTTPD->{url}  = sprintf('%s://%s%s',$prefix,$HTTPD->{host},$HTTPD->{uri}) if $HTTPD->{host}; 
-        #$type    = _guess_type($uri);
+        #$type         = _guess_type($uri);
 
 	return $HTTPD;
 }
@@ -401,6 +461,17 @@ sub _collect_host_ip {
 	my($self,$cIndex) = @_;
 
 #	printf("%s CONV:[%d]\n%s\n",(caller(0))[3],$cIndex,Dumper $self->{CONV}{$cIndex});
+
+	return;
+}
+
+# +
+# +
+# +
+sub _normalize_conversation_data {
+	my($self,$cIndex) = @_;
+	# shunt the data unless this looks like a payload
+	$self->{CONV}{$cIndex}{data} = undef unless Pcap::ContentType::is_payload($self->{CONV}{$cIndex}{'Content-Type'});
 
 	return;
 }
