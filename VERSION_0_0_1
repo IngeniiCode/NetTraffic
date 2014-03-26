@@ -32,6 +32,18 @@
  * removed some php code that been accidentatlly left
    in my POC directory
  * further improvements on the Conversations Parser,
-
++ - - - - - - - - - - - - - - - - - - - - - - - - - - 
+26-MAR-2014 --  VERSION 0.0.1.e
+ * tuned up the conversations with nicer formatting
+ * added the Hostname export w/ whois
+ * added Hostname popularity to summary page.
+ * crated a database to store hostname and ip data 
+   for faster local lookup and to keep tool mostly
+   flying under the whois radar.
+ * added a schema for the sqlite3 database I plan
+   to use for localized lookups.
+ * adding the database itself to the commit.. as it
+   could be useful as a portable integrated component
+   of this tool.
 + - - - - - - - - - - - - - - - - - - - - - - - - - - 
 

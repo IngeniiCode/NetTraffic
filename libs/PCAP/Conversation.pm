@@ -95,14 +95,12 @@ sub _process_conversations {
 	foreach my $cIndex (keys %{$self->{'CONV'}}){
 		my $filter;
 		my $filter_c;  # hold the compiled filter
-		printf("IDX: %06d\n",$cIndex); 
 		my $C = $self->{'CONV'}{$cIndex};  # localize this thing
 		# Build a filter based on this conversations knows
 		# read entire conversation
 		# construct a filter
-		$filter = sprintf('tcp and (host %s and host %s) and (port %d and port %d)',$C->{src_ip},$C->{dest_ip},$C->{src_port},$C->{dest_port});
 		$filter = sprintf('(host %s and host %s) and (port %d and port %d)',$C->{src_ip},$C->{dest_ip},$C->{src_port},$C->{dest_port});
-printf("====== FILTER: %s ========\n",$filter);
+#printf("====== FILTER: %s ========\n",$filter);
 		$self->_assemble_conversation($cIndex,$filter);
 	
 	}
@@ -159,6 +157,9 @@ sub _assemble_conversation {
 
 	# read all the packets
 	Net::Pcap::loop( $self->{PCAP}, -1, \&_read_all_matching, [$self,$cIndex] );  # self is passed as user data
+
+	# collect up the hostname and IP from conversation
+	$self->_collect_host_ip($cIndex);
 
 	# close the network file (since we have finished our processing)
 	Net::Pcap::close( $self->{PCAP} );
@@ -289,21 +290,11 @@ sub _read_all_matching {
 	# RETURN unless this is some type of IP 
 	return unless $eth_type eq 'IP'; 
 
-	# Try to HTTP parse everything.. to heck with it!!!
-	$httpd = _http('http',$trans);
-
-#	# Check to see if it looks like Web traffic
-#	switch ($trans->{'dest_port'}) {
-#		case 	80   {
-#			# HTTP
-#			$httpd = _http('http',$trans);
-#			}
-#		case   443   {
-#			# HTTPS
-#			$httpd = _http('https',$trans);
-#			}
-#		
-#	};
+	# Try to HTTP parse everything.. set https as tag for port 443, use http for everything else
+	switch ($trans->{'dest_port'}) {
+		case   443   { $httpd = _http('https',$trans); }
+		else         { $httpd = _http('http',$trans);  }
+	};
 
 	if($httpd) {
 		# attempt to integrat this into the conversation block
@@ -403,6 +394,16 @@ sub _http {
 	return $HTTPD;
 }
 
+# +
+# +  HTTP Packet Processing
+# +
+sub _collect_host_ip {
+	my($self,$cIndex) = @_;
+
+#	printf("%s CONV:[%d]\n%s\n",(caller(0))[3],$cIndex,Dumper $self->{CONV}{$cIndex});
+
+	return;
+}
 
 # +
 # +  initialize the pcap handle, with passed infile name

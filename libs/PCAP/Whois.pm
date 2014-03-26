@@ -148,6 +148,7 @@ sub registrant {
 sub blind_iterate {
 	my ($ax) = @_;
 	my @outlist;
+	return @outlist unless ref($ax) eq 'ARRAY';
 
 	my $ct=0;
 	while (my $ar = pop($ax) || $ct < 20){

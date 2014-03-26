@@ -1,0 +1,67 @@
+CREATE TABLE hostname
+      (ID INT PRIMARY KEY        NOT NULL,
+       hostname       CHAR(255)  NOT NULL,
+       domain         CHAR(64)   NOT NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE UNIQUE INDEX hostname_hostname ON hostname (hostname);
+CREATE INDEX hostname_domain ON hostname (domain);
+CREATE INDEX hostname_updated ON hostname (updated);
+
+
+CREATE TABLE domain
+      (ID INT PRIMARY KEY        NOT NULL,
+       domain       CHAR(255)    NOT NULL,
+       whois        TEXT         NULL,
+       dns          TEXT         NULL, 
+       whois_good   INT          NOT NULL,
+       dns_good     INT          NOT NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE INDEX domain_domain ON domain (domain);
+CREATE INDEX domain_whois_good ON domain (whois_good);
+CREATE INDEX domain_dns_good ON domain (dns_good);
+CREATE INDEX domain_updated ON domain (updated);
+
+
+CREATE TABLE ips
+      (ID INT PRIMARY KEY        NOT NULL,
+       ip           CHAR(16)     NOT NULL,
+       hostname     CHAR(255)    NULL,
+       domain       CHAR(64)     NULL,
+       ip_geolocate TEXT         NULL,
+       geo_good     INT          NOT NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE INDEX ips_ip ON ips (domain);
+CREATE INDEX ips_hostname ON ips (hostname);
+CREATE INDEX ips_domain ON ips (domain);
+CREATE INDEX ips_geo_good ON ips (geo_good);
+
+
+CREATE TABLE app_hostnames
+      (ID INT PRIMARY KEY        NOT NULL,
+       app_file     CHAR(255)    NOT NULL,
+       hostname     CHAR(255)    NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE INDEX app_hostnames_app_file ON app_hostnames (app_file);
+
+
+CREATE TABLE app_domains
+      (ID INT PRIMARY KEY        NOT NULL,
+       app_file       CHAR(255)    NOT NULL,
+       domain         CHAR(64)    NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE INDEX app_domains_app_file ON app_domains (app_file);
+
+CREATE TABLE app_ips
+      (ID INT PRIMARY KEY        NOT NULL,
+       app_file       CHAR(255)    NOT NULL,
+       ip             CHAR(16)    NULL,
+       updated        datetime   NOT NULL
+       );
+CREATE INDEX app_domains_app_file ON app_ips (app_file);
+
+
