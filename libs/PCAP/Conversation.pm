@@ -14,6 +14,7 @@ use NetPacket::TCP qw(:ALL);
 use NetPacket::UDP qw(:ALL);
 use Pcap::PortService; 
 use Pcap::ContentType;
+use Pcap::DecodeJson;
 # - - - used for encoding issues - - -
 use utf8;
 use Text::Unidecode;
@@ -303,12 +304,7 @@ sub _read_all_matching {
 	if($httpd) {
 		# attempt to integrat this into the conversation block
 		foreach my $key (keys %$httpd) {
-			if($key eq 'data'){
-				$self->{'CONV'}{$cIndex}{$key} .= $httpd->{$key};  # append
-			}
-			else {
 				$self->{'CONV'}{$cIndex}{$key} ||= $httpd->{$key} || '';  # set if not yet set.
-			}
 		}
 	}
 	
@@ -472,6 +468,16 @@ sub _normalize_conversation_data {
 	my($self,$cIndex) = @_;
 	# shunt the data unless this looks like a payload
 	$self->{CONV}{$cIndex}{data} = undef unless Pcap::ContentType::is_payload($self->{CONV}{$cIndex}{'Content-Type'});
+
+	if($self->{CONV}{$cIndex}{'Content-Type'} =~ /json/) {
+		my $JSON = new Pcap::DecodeJson($self->{CONV}{$cIndex}{'data'});
+		my $decoded = $JSON->extract();
+		if(ref($decoded) eq 'HASH'){
+			# this is still a hash.. crazy..
+			$decoded = sprintf('%s',Dumper($decoded));
+		}
+		$self->{CONV}{$cIndex}{'decoded_data'} = $decoded;
+	}
 
 	return;
 }

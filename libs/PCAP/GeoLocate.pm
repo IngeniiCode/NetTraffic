@@ -20,6 +20,7 @@ my $parse_config = {
 	start => '"S", tagname, attr, dtext',
 	text  => 'dtext',
 };
+my $CACHE = {}; # ip geo-located cache
 
 # =============================
 #  Define  Package Methods
@@ -44,6 +45,9 @@ sub new {
 # +
 sub go {
 	my ($self,$ip) = @_;
+	chomp ($ip);
+
+	return $self->{DATA} = $CACHE->{$ip} if $CACHE->{$ip};
 	
 	# ---  get the response
 	$self->{MECH}->get($url);  # intake page
@@ -59,6 +63,8 @@ sub go {
 
 	# ---  parse for desired elements
 	$self->_parse();
+
+	$CACHE->{$ip} = $self->{DATA}; # store to cache to speed retrieval
 
 	return;
 }
@@ -85,6 +91,20 @@ sub get_data {
 sub get_mojo_text_all {
 	my($self) = @_;
 	return $self->{TEXT};
+}
+
+# +
+# +
+# +
+sub get_geoblock {
+	my($self) = @_;
+
+	return sprintf("%s\n - - - - - - - - - - - - - - -\n%s\n%s\n%s",
+		$self->{DATA}{org},
+		$self->{DATA}{isp},
+		$self->{DATA}{host},
+		$self->{DATA}{country}
+	);
 }
 
 # +

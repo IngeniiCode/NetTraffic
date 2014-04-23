@@ -13,6 +13,7 @@ use Data::Dumper;
 # =============================
 #  Define global scoped variables
 # =============================
+my $CACHE = {};
 
 
 # =============================
@@ -38,11 +39,24 @@ sub new {
 sub go {
 	my ($self,$hostname) = @_;
 
+	chomp($hostname);
+	# set hostname for later use in the cache
+	my $orig_host = $hostname;
+
+	$self->{DATA} = {}; # clear the current record from memory
+	
+	# check to see if it's already known and if so, set to current and return data
+	if($CACHE->{$orig_host}){
+		$self->{DATA} = $CACHE->{$orig_host};
+		return $self->{DATA};
+	}
+
+	# not yet known, go look for the data
 	do {
-		$self->{DATA} = {}; # empty
 		# try to parse first time out.
 		if($self->{DATA} = parse_whois( domain => $hostname )){
 			# found it
+			$CACHE->{$orig_host} = $self->{DATA} if $self->{DATA}{registrar};  # don't save an empty response
 			return $self->{DATA};
 		}
 		# Take off the front part and try again
