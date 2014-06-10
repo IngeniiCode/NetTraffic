@@ -1,0 +1,9 @@
++----------------------------------------------------
+|  VERSION  1.0.0  --  production development
++----------------------------------------------------
+- - - - - - - - - - - - - - - - - - - - - - - - - - - 
+10-JUN-2014 --  VERSION 1.0.0.a
++ moved the functional code to tools, left the
+  development versions in 'poc' 
+- - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
