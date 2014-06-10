@@ -5,5 +5,8 @@
 10-JUN-2014 --  VERSION 1.0.0.a
 + moved the functional code to tools, left the
   development versions in 'poc' 
++ added stubs for required libs to parse out an
+  appID from the filename, and then grab the data
+  from client database to identify the package.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
