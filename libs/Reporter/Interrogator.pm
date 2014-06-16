@@ -1,5 +1,5 @@
 # =============================
-  package Reporter::XLSX
+  package Reporter::Interrogator;
 # =============================
 
 use strict;
@@ -9,6 +9,7 @@ use PCAP::GeoLocate;
 use PCAP::Whois;
 use PCAP::ContentType;
 use File::Basename;
+use Text::Wrap;
 use Data::Dumper;
 # - - - - - - - - - - - - - - - 
 my $fmt    = {};
@@ -18,28 +19,24 @@ my $orig_file;
 # +  --   C O N S T R U C T O R     --  + 
 # + + + + + + + + + + + + + + + + + + + +
 sub new {
-	my ($class,$file) = @_;
+	my $class = shift;
+	my $self  = shift;
+	$self->{outfile}  = sprintf('%s.interrogator.xlsx',$self->{orig_file});	
+	$self->{basename} = _format_filename(basename($self->{orig_file})); 
+	$self->{GEO}      = new Pcap::GeoLocate;
+	$self->{WHO}      = new Pcap::Whois;
 
-	my $outfile = sprintf('%s.v3.xlsx',$file);	
-	my $WB = Excel::Writer::XLSX->new($outfile);
+	$self->{WB} = Excel::Writer::XLSX->new($self->{outfile});
 
-        $WB->set_properties(
-                title    => sprintf('%s Network Analysis Report',$file),
-                author   => 'David DeMartini  fbo  Appdetex.com',
-                comments => 'Automated Network Traffic Analysis',
+        $self->{WB}->set_properties(
+                title     => sprintf('%s Network Analysis Report ',$self->{title}),
+		comments  => $self->{desc},
+                author    => 'David DeMartini  fbo  Appdetex.com',
+                comments  => 'Automated Network Traffic Analysis',
         );
 
 	# set formatting
-	_define_formatting($WB);
-
-	my $self  = { 
-		outfile    => $outfile,
-		orig_file  => $file,
-		basename   => _format_filename(basename($file)),
-		WB         => $WB, 
-		GEO        => new Pcap::GeoLocate,
-		WHO        => new Pcap::Whois,
-	};
+	_define_formatting($self->{WB});
 
 	return bless ($self, $class); #this is what makes a reference into an object
 }
@@ -60,6 +57,7 @@ printf("CONVS %s\n",Dumper $self->{CONVS});
 
 	# Write the report information
 	$self->_summary();
+
 	$self->_conversations_media();
 	$self->_conversations_payload();
 	$self->_conversations_general();
@@ -85,7 +83,8 @@ sub _summary {
 	my $sum_ws  = $self->{WB}->add_worksheet( 'Summary' );
 
 	my $block_start = 0;
-	my $next_block_start = 4;
+	my $block_end   = 0;
+	my $next_block_start = 0;
 	my $temp;
 
 	$sum_ws->set_tab_color( 'green' );	
@@ -95,14 +94,27 @@ sub _summary {
 	$sum_ws->set_column(9,9,3);
 
 	# Add header
-	$sum_ws->merge_range(0,0,0,14,'',$fmt->{header});
-	$sum_ws->write_string(0,0,sprintf('Network Analysis Summary for   [ %s ]',$self->{basename}),$fmt->{header});
+	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{header});
+	$sum_ws->write_string($block_start,0,sprintf('Network Analysis Summary for  %s',$self->{title}),$fmt->{header});
+
+	# Add Application Information
+	$block_start += 3;
+	$block_end = $block_start + 2;  # base of block
+	$sum_ws->merge_range($block_start,0,$block_end,1,'',$fmt->{app_logo}); 
+	$sum_ws->insert_image($block_start,0, $self->{logo},5,5,0.5,0.5);
+
+	$sum_ws->merge_range($block_start,2,$block_start,14,'Title: '.$self->{title},$fmt->{app_title});
+	$sum_ws->merge_range(++$block_start,2,$block_start,14,'Author: '.$self->{author},$fmt->{app_author});
+	#$sum_ws->merge_range(++$block_start,2,$block_end,14,_make_wrappy($self->{desc}),$fmt->{app_description});
+	$sum_ws->merge_range(++$block_start,2,$block_end,14,$self->{desc},$fmt->{app_description});
 
 	# Conversation Information
-	$sum_ws->merge_range(2,0,2,14,'',$fmt->{section});
-	$sum_ws->write_string(2,0,sprintf(' %d   Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
+	$block_start += 2;
+	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{section});
+	$sum_ws->write_string($block_start,0,sprintf(' %d  Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
 
 	# Groupings
+	$next_block_start = $block_start + 2;
 	if($temp = $self->_insert_traffic_data_types(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
 		$block_start = ($temp > $block_start) ? $temp : $block_start;
 	}
@@ -120,10 +132,8 @@ sub _summary {
 		$block_start = ($temp > $block_start) ? $temp : $block_start;
 	}
 
-	
 	# Next block of items
 	$next_block_start = $block_start + 2;  # leave some space before next block
-
 
 	return;
 
@@ -184,7 +194,7 @@ sub _conversations_general {
 
 	# Add header
 	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Network Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+	$ws->write_string(0,0,sprintf('Network Conversations for %s',$self->{title}),$fmt->{header});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section});
@@ -229,7 +239,7 @@ sub _conversations_media {
 
 	# Add header
 	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Audio / Video Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+	$ws->write_string(0,0,sprintf('Audio / Video Conversations for %s' ,$self->{title}),$fmt->{header});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section});
@@ -274,7 +284,7 @@ sub _conversations_payload {
 
 	# Add header
 	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Payload Typical Conversations for   [ %s ]',$self->{basename}),$fmt->{header});
+	$ws->write_string(0,0,sprintf('Payload Typical Conversations for %s',$self->{title}),$fmt->{header});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section});
@@ -600,7 +610,7 @@ sub _add_dns {
 	$ws->set_tab_color('blue');
 
 	# Add header
-	my $title = sprintf('Hostnames Resolved by   [ %s ]',$self->{basename});
+	my $title = sprintf('Hostnames Resolved by  %s',$self->{title});
 	$ws->merge_range(0,0,0,7,$title,$fmt->{header});
 
 	# Set column widths
@@ -662,7 +672,7 @@ sub _add_ipgeo {
 	$ws->set_tab_color('blue');
 
 	# Add header
-	my $title = sprintf('IPs Related to   [ %s ]',$self->{basename});
+	my $title = sprintf('IPs Related to  %s',$self->{title});
 	$ws->merge_range(0,0,0,7,$title,$fmt->{header});
 
 
@@ -769,6 +779,17 @@ sub _consolidate_hosts {
 	return $HOSTS;
 }
 
+# +
+# +  --  defines a CRUDE text wrapping strategy
+# +
+sub _make_wrappy {
+	my($str) = @_;
+
+	# do some text wrapping automagically
+	$Text::Wrap::columns = 132;
+
+	return wrap('','',$str);
+}
 
 # +
 # +  Define formatting for the entire workbook
@@ -778,6 +799,38 @@ sub _define_formatting {
  
 	# Define WorkBook formatting
 	my $lt_grey = $WB->set_custom_color( 40, 236, 236, 236 );
+
+	$fmt->{app_title} = $WB->add_format( bold => 1);
+		$fmt->{app_title}->set_size( 20 );
+		$fmt->{app_title}->set_color( 'black' );
+		$fmt->{app_title}->set_bg_color( 'white' );
+		$fmt->{app_title}->set_top( 2 );
+		$fmt->{app_title}->set_right( 2 );
+
+	$fmt->{app_author} = $WB->add_format( bold => 1);
+		$fmt->{app_author}->set_size( 20 );
+		$fmt->{app_author}->set_color( 'black' );
+		$fmt->{app_author}->set_bg_color( 'white' );
+		$fmt->{app_author}->set_right( 2 );
+
+	$fmt->{app_description} = $WB->add_format( bold => 0);
+		$fmt->{app_description}->set_size( 13 );
+		$fmt->{app_description}->set_text_wrap( 1 );
+		$fmt->{app_description}->set_align( 'vjustify' );
+		$fmt->{app_description}->set_align( 'top' );
+		$fmt->{app_description}->set_color( 'black' );
+		$fmt->{app_description}->set_bg_color( 'white' );
+		$fmt->{app_description}->set_right( 2 );
+		$fmt->{app_description}->set_bottom( 2 );
+
+	$fmt->{app_logo} = $WB->add_format( bold => 0);
+		$fmt->{app_logo}->set_text_wrap( 1 );
+		$fmt->{app_logo}->set_align( 'vcenter' );
+		$fmt->{app_logo}->set_top( 2 );
+		$fmt->{app_logo}->set_left( 2 );
+		$fmt->{app_logo}->set_right( 2 );
+		$fmt->{app_logo}->set_bottom( 2 );
+		#$fmt->{app_logo}->set_center_across( 1 );
 
 	$fmt->{header} = $WB->add_format( bold => 1);
 		$fmt->{header}->set_size( 20 );

@@ -1,5 +1,5 @@
 # =============================
-  package Solr::Application;
+  package Image::GetLogo;
 # =============================
 
 
@@ -7,13 +7,12 @@
 #  Define required modules
 # =============================
 use strict;
-use Solr::Base;
 use Data::Dumper;
+use LWP::Simple;
 
 # =============================
 #  Define global scoped variables
 # =============================
-my $fBase   = '';  # path to intake file, drop report in same location.
 
 # =============================
 #  Define  Package Methods
@@ -24,7 +23,9 @@ my $fBase   = '';  # path to intake file, drop report in same location.
 # + + + + + + + + + + + + + + + + + + + +
 sub new {
 	my $class = shift;
-	my $self  = { @_ };
+	my $self  = { 
+		'image_path' => @_ 
+	};
 	
 	return bless ($self, $class); #this is what makes a reference into an object
 }
@@ -32,10 +33,17 @@ sub new {
 # +
 # +  --  define a sub-routine 
 # +
-sub getApp {
-	my($type,$header,$raw) = @_;
+sub getImage {
+	my($self,$logourl) = @_;
 
-	return;
+	my @pathparts = split('/',$logourl);
+	my $fname = sprintf('%s/%s',$self->{image_path},pop(@pathparts));
+
+	# download image from interwebs
+	getstore($logourl, $fname);
+
+	return $fname;
+
 }
 
 # +

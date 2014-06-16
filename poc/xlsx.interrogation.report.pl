@@ -1,49 +1,88 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl
+ 
 use strict;
 use warnings;
 
-$| = 1;
-
-#
+# =============================
 #  Define required modules
-#
+# =============================
 use File::ParseName;
 use Solr::Application;
+use Image::GetLogo;
 use PCAP::Conversation;
-use PCAP::Xlsx::Reporter;
+use Reporter::Interrogator;
 use Data::Dumper;
+use Solr::Base;
+
+# =================================
+#  Define global scoped variables
+# =================================
+my $SOLR = new Solr::Base();
+my $AppInfo;
+my $F;
+my $C;
+my $REP;
+my $IMG;
+my $outfile;
+my $logoFile;
+my $REPORT;
+my $appID;
+my $file;
+
+# =================================
+$| = 1;
+# =================================
+
+# =================================
+#  App Info Retrieval 
+# =================================
 
 # Snarf in the file off arglist (not parameteized, should be fixed in later revision)
-my $file = $ARGV[0];
-
+$file = $ARGV[0];
 printf("Intake File: %s\n",$file);
-exit 0;
-
 
 # Parse out the appID from filename, if possible.  This should be in a URL encoded format
 # to protect nasties like slashes etc. etc. etc.
-my $F     = new File::ParseName;
-my $appID = $F->get_app_id($file);
+$F     = new File::ParseName($file);
+$appID = $F->get_app_id();
+printf("AppID: %s\n",$appID);
+
+# Set image processing paths
+$IMG = new Image::GetLogo($F->path());
 
 # once parsed from filename, then need to grab some of the parts from Solr for creating the 
 # summary page.
-my $App     = new Solr::Application;
-my $AppInfo = $App->get_app_info($appID);
+$AppInfo = $SOLR->getApp($appID);
 
-printf("Filename:  %s\n",$file);
-printf("AppID:     %s\n",$appID);
-printf("Info:      %s\n",$AppInfo);
+printf("Filename:     %s\n",$file);
+printf("AppID:        %s\n",$AppInfo->{id} || 'bad_id: '.$appID);
+printf("Title:        %s\n",$AppInfo->{title});
+printf("Logo:         %s\n",$AppInfo->{logo});
+printf("Description:  \n%s\n",$AppInfo->{description});
 
-exit 0;
+# Grab the image
+$logoFile = $IMG->getImage($AppInfo->{logo});
+printf("LogoFile:     %s\n",$logoFile);
+
+# =================================
+#  Report Prep
+# =================================
+my $tcfg = {
+	orig_file => $file,
+	title     => $AppInfo->{title},
+	desc      => $AppInfo->{description},
+	author    => $AppInfo->{developer},
+	logo      => $logoFile,
+};
+$REP  = Reporter::Interrogator->new($tcfg);
 
 printf("Extrating Conversations from:%s\n",$file);
-my $C      = new Pcap::Conversation;
-my $REPORT = $C->process_file($file);
+$C      = new Pcap::Conversation;
+$REPORT = $C->process_file($file);
 printf("Extraction Completed\n");
 
 printf("Writing report for %s\n",$file);
-my $X       = Pcap::Xlsx::Reporter->new($file);
-my $outfile = $X->write_report($REPORT);
+$outfile = $REP->write_report($REPORT);
 
 printf("Report written to: %s\n",$outfile);
 
