@@ -7,15 +7,17 @@ use warnings;
 #  Define required modules
 # =============================
 use File::ParseName;
+use Solr::Application;
 use Image::GetLogo;
 use PCAP::Conversation;
-use Reporter::Interrogator;
+use Reporter::AppDetex;
 use Data::Dumper;
 use Solr::Base;
 
 # =================================
 #  Define global scoped variables
 # =================================
+my $SOLR = new Solr::Base();
 my $AppInfo;
 my $F;
 my $C;
@@ -39,13 +41,40 @@ $| = 1;
 $file = $ARGV[0];
 printf("Intake File: %s\n",$file);
 
+# Parse out the appID from filename, if possible.  This should be in a URL encoded format
+# to protect nasties like slashes etc. etc. etc.
+$F     = new File::ParseName($file);
+$appID = $F->get_app_id();
+printf("AppID: %s\n",$appID);
+
+# Set image processing paths
+$IMG = new Image::GetLogo($F->path());
+
+# once parsed from filename, then need to grab some of the parts from Solr for creating the 
+# summary page.
+$AppInfo = $SOLR->getApp($appID);
+
+printf("Filename:     %s\n",$file);
+printf("AppID:        %s\n",$AppInfo->{id} || 'bad_id: '.$appID);
+printf("Title:        %s\n",$AppInfo->{title});
+printf("Logo:         %s\n",$AppInfo->{logo});
+printf("Description:  \n%s\n",$AppInfo->{description});
+
+# Grab the image
+$logoFile = $IMG->getImage($AppInfo->{logo});
+printf("LogoFile:     %s\n",$logoFile);
+
 # =================================
 #  Report Prep
 # =================================
 my $tcfg = {
 	orig_file => $file,
+	title     => $AppInfo->{title},
+	desc      => $AppInfo->{description},
+	author    => $AppInfo->{developer},
+	logo      => $logoFile,
 };
-$REP  = Reporter::Interrogator->new($tcfg);
+$REP  = Reporter::Interrogator::AppDetex->new($tcfg);
 
 printf("Extrating Conversations from:%s\n",$file);
 $C      = new Pcap::Conversation;
