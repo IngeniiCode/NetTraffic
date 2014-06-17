@@ -55,10 +55,7 @@ $IMG = new Image::GetLogo($F->path());
 $AppInfo = $SOLR->getApp($appID);
 
 printf("Filename:     %s\n",$file);
-printf("AppID:        %s\n",$AppInfo->{id} || 'bad_id: '.$appID);
-printf("Title:        %s\n",$AppInfo->{title});
-printf("Logo:         %s\n",$AppInfo->{logo});
-printf("Description:  \n%s\n",$AppInfo->{description});
+printf("AppInfo: %s\n",Dumper $AppInfo);
 
 # Grab the image
 $logoFile = $IMG->getImage($AppInfo->{logo});
@@ -71,7 +68,11 @@ my $tcfg = {
 	orig_file => $file,
 	title     => $AppInfo->{title},
 	desc      => $AppInfo->{description},
-	author    => $AppInfo->{developer},
+	publisher => $AppInfo->{publisher},
+	store     => $AppInfo->{store},
+	price     => $AppInfo->{price},
+	category  => $AppInfo->{category},
+	downloads => $AppInfo->{numDownload},
 	logo      => $logoFile,
 };
 $REP  = Reporter::Interrogator::AppDetex->new($tcfg);

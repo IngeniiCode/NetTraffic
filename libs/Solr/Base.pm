@@ -57,10 +57,11 @@ sub getApp {
 			title       => $obj->{appTitle} || '',
 			description => $obj->{appDescription} || '',
 			developer   => $obj->{developer} || '',
+			publisher   => $obj->{seller} || '',
 			store       => $obj->{store} || '',
 			price       => $obj->{price} || '',
 			category    => $obj->{category} || '',
-			numDownload => $obj->{numDownload} || '',
+			numDownload => $obj->{numDownloads} || '',
 		};
 		return $info;
 	}
@@ -81,7 +82,7 @@ sub solrUrlSynth {
 	my($self,$appID) = @_;
 
 	my $base    = '/select?q=id%3A%22'.uri_escape($appID).'%22';
-	my $fields  = '&fl=id%2CappTitle%2CappDescription%2CappLogo%2Cdeveloper%2Cstore%2Cprice%2category%2CnumDownloads';
+	my $fields  = '&fl=id%2CappTitle%2CappDescription%2CappLogo%2Cdeveloper%2Cstore%2Cprice%2category%2CnumDownloads%2Ccategory';
 	my $options = '&wt=json&indent=true';
 
 	return $CORES->{CORE1}.$base.$fields.$options;

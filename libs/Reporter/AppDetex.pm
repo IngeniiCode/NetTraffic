@@ -10,6 +10,7 @@ use PCAP::Whois;
 use PCAP::ContentType;
 use File::Basename;
 use Text::Wrap;
+use Reporter::FormatsAppDetex;
 use Data::Dumper;
 # - - - - - - - - - - - - - - - 
 my $fmt    = {};
@@ -21,7 +22,7 @@ my $orig_file;
 sub new {
 	my $class = shift;
 	my $self  = shift;
-	$self->{outfile}  = sprintf('%s.interrogator.xlsx',$self->{orig_file});	
+	$self->{outfile}  = sprintf('%s.appdetex.xlsx',$self->{orig_file});	
 	$self->{basename} = _format_filename(basename($self->{orig_file})); 
 	$self->{GEO}      = new Pcap::GeoLocate;
 	$self->{WHO}      = new Pcap::Whois;
@@ -36,7 +37,7 @@ sub new {
         );
 
 	# set formatting
-	_define_formatting($self->{WB});
+	$fmt = Reporter::Formats::set_formatting($self->{WB});
 
 	return bless ($self, $class); #this is what makes a reference into an object
 }
@@ -58,14 +59,14 @@ printf("CONVS %s\n",Dumper $self->{CONVS});
 	# Write the report information
 	$self->_summary();
 
-	$self->_conversations_media();
-	$self->_conversations_payload();
-	$self->_conversations_general();
-	$self->_add_dns();
-	$self->_add_ipgeo();
-	#$self->_traffic_host();
-	#$self->_traffic_url();
-	#$self->_traffic_type();
+#	$self->_conversations_media();
+#	$self->_conversations_payload();
+#	$self->_conversations_general();
+#	$self->_add_dns();
+#	$self->_add_ipgeo();
+#	#$self->_traffic_host();
+#	#$self->_traffic_url();
+#	#$self->_traffic_type();
 
 	# Close and Save
 	$self->{WB}->close();
@@ -95,66 +96,90 @@ sub _summary {
 	$sum_ws->set_column(9,9,3);
 
 	# Add banner
+	$sum_ws->set_row(0,32);
 	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{banner});
 	$sum_ws->write_string($block_start,0,'AppDetex App Interrogation Report',$fmt->{banner});
-	#$sum_ws->write_string($block_start,0,sprintf('Network Analysis Summary for  %s',$self->{title}),$fmt->{banner});
 
 	# Content for Investigation 
 	$block_start += 2;
-	$sum_ws->merge_range($block_start,0,$block_start,1,'Content for Investigation',$fmt->{info_head_dk});
-	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{title},$fmt->{info_head_dk});
+	$sum_ws->set_row($block_start,26);
+	$sum_ws->merge_range($block_start,0,$block_start,3,'Content for Investigation',$fmt->{info_head_dk});
+	$sum_ws->merge_range($block_start,4,$block_start,14,$self->{title},$fmt->{info_head_lt});
+
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'App Title ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{title},$fmt->{info_app_title});
 		
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Publisher ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{publisher},$fmt->{info_large});
 
-	$block_end = $block_start + 2;  # base of block
-	$sum_ws->merge_range($block_start,0,$block_end,1,'',$fmt->{app_logo}); 
-	$sum_ws->insert_image($block_start,0, $self->{logo},5,5,0.5,0.5);
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Description ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start+1,14,$self->{desc},$fmt->{info_desc});
 
-	$sum_ws->merge_range($block_start,2,$block_start,14,'Title: '.$self->{title},$fmt->{app_title});
-	$sum_ws->merge_range(++$block_start,2,$block_start,14,'Author: '.$self->{author},$fmt->{app_author});
-	#$sum_ws->merge_range(++$block_start,2,$block_end,14,_make_wrappy($self->{desc}),$fmt->{app_description});
-	$sum_ws->merge_range(++$block_start,2,$block_end,14,$self->{desc},$fmt->{app_description});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'',$fmt->{info_label});
+	$sum_ws->insert_image($block_start,0,$self->{logo},5,5,0.5,0.5);
 
-	# Conversation Information
-	$block_start += 2;
-	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{section});
-	$sum_ws->write_string($block_start,0,sprintf(' %d  Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Store ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{store},$fmt->{info_large});
 
-	# Groupings
-	$next_block_start = $block_start + 2;
-	if($temp = $self->_insert_traffic_data_types(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
-		$block_start = ($temp > $block_start) ? $temp : $block_start;
-	}
-	if($temp = $self->_insert_traffic_data_destinations(\$sum_ws,$next_block_start,5,8)) {  # send worksheet, and starting co-ordinate and columns
-		$block_start = ($temp > $block_start) ? $temp : $block_start;
-	}
-	if($temp = $self->_insert_traffic_data_hostnames(\$sum_ws,$next_block_start,10,14)) {  # send worksheet, and starting co-ordinate and columns
-		$block_start = ($temp > $block_start) ? $temp : $block_start;
-	}
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Price ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{price},$fmt->{info_large});
 
-	# Next block of items
-	$next_block_start = $block_start + 2;  # leave some space before next block
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Category ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,ucfirst($self->{category}),$fmt->{info_large});
 
-	if($temp = $self->_insert_traffic_data_media(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
-		$block_start = ($temp > $block_start) ? $temp : $block_start;
-	}
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Aprox Downloads ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{downloads},$fmt->{info_large});
 
-	# Next block of items
-	$next_block_start = $block_start + 2;  # leave some space before next block
+#	$block_end = $block_start + 2;  # base of block
+#	$sum_ws->merge_range($block_start,0,$block_end,1,'',$fmt->{app_logo}); 
+#	$sum_ws->insert_image($block_start,0, $self->{logo},5,5,0.5,0.5);
 
-	return;
+#	$sum_ws->merge_range($block_start,2,$block_start,14,'Title: '.$self->{title},$fmt->{app_title});
+#	$sum_ws->merge_range(++$block_start,2,$block_start,14,'Author: '.$self->{author},$fmt->{app_author});
+#	#$sum_ws->merge_range(++$block_start,2,$block_end,14,_make_wrappy($self->{desc}),$fmt->{app_description});
+#	$sum_ws->merge_range(++$block_start,2,$block_end,14,$self->{desc},$fmt->{app_description});
 
-	# Add frames summary
-	$sum_ws->merge_range(1,1,1,3,'',$fmt->{normal});
-	$sum_ws->write_string(1,0,"Frames",$fmt->{bold});
-	$sum_ws->write_string(1,1,$self->{REPORT}->{packets}||0,$fmt->{normal});
+#	# Conversation Information
+#	$block_start += 2;
+#	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{section});
+#	$sum_ws->write_string($block_start,0,sprintf(' %d  Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
 
-	$sum_ws->write_string(2,0,"Start time",$fmt->{bold});
-	$sum_ws->merge_range(2,1,2,3,'',$fmt->{normal});
-	$sum_ws->write_string(2,1,$self->{REPORT}->{start_time}||'',$fmt->{normal});
-	$sum_ws->write_string(3,0,"Stop time",$fmt->{bold});
-	$sum_ws->merge_range(3,1,3,3,'',$fmt->{normal});
-	$sum_ws->write_string(3,1,$self->{REPORT}->{stop_time}||'',$fmt->{normal});
-
+#	# Groupings
+#	$next_block_start = $block_start + 2;
+#	if($temp = $self->_insert_traffic_data_types(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
+#		$block_start = ($temp > $block_start) ? $temp : $block_start;
+#	}
+#	if($temp = $self->_insert_traffic_data_destinations(\$sum_ws,$next_block_start,5,8)) {  # send worksheet, and starting co-ordinate and columns
+#		$block_start = ($temp > $block_start) ? $temp : $block_start;
+#	}
+#	if($temp = $self->_insert_traffic_data_hostnames(\$sum_ws,$next_block_start,10,14)) {  # send worksheet, and starting co-ordinate and columns
+#		$block_start = ($temp > $block_start) ? $temp : $block_start;
+#	}
+#
+#	# Next block of items
+#	$next_block_start = $block_start + 2;  # leave some space before next block
+#
+#	if($temp = $self->_insert_traffic_data_media(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
+#		$block_start = ($temp > $block_start) ? $temp : $block_start;
+#	}
+#
+#	# Next block of items
+#	$next_block_start = $block_start + 2;  # leave some space before next block
+#
+#	return;
+#
+#	# Add frames summary
+#	$sum_ws->merge_range(1,1,1,3,'',$fmt->{normal});
+#	$sum_ws->write_string(1,0,"Frames",$fmt->{bold});
+#	$sum_ws->write_string(1,1,$self->{REPORT}->{packets}||0,$fmt->{normal});
+#
+#	$sum_ws->write_string(2,0,"Start time",$fmt->{bold});
+#	$sum_ws->merge_range(2,1,2,3,'',$fmt->{normal});
+#	$sum_ws->write_string(2,1,$self->{REPORT}->{start_time}||'',$fmt->{normal});
+#	$sum_ws->write_string(3,0,"Stop time",$fmt->{bold});
+#	$sum_ws->merge_range(3,1,3,3,'',$fmt->{normal});
+#	$sum_ws->write_string(3,1,$self->{REPORT}->{stop_time}||'',$fmt->{normal});
+#
 	return;
 }
 
@@ -795,98 +820,6 @@ sub _make_wrappy {
 	$Text::Wrap::columns = 132;
 
 	return wrap('','',$str);
-}
-
-# +
-# +  Define formatting for the entire workbook
-# + 
-sub _define_formatting {
-	my ($WB) = @_;
- 
-	# Define WorkBook formatting
-	my $lt_grey = $WB->set_custom_color( 40, 236, 236, 236 );
-	my $headred = $WB->set_custom_color( 27, 182, 1, 35 );
-	my $blkgray = $WB->set_custom_color( 38, 64, 64, 64 );
-	my $cl_section = $WB->set_custom_color( 33, 84, 84, 84 );
-
-	$fmt->{header} = $WB->add_format( bold => 1);
-		$fmt->{header}->set_size( 20 );
-		$fmt->{header}->set_color( 'white' );
-		$fmt->{header}->set_bg_color( $headred );
-
-	$fmt->{app_title} = $WB->add_format( bold => 1);
-		$fmt->{app_title}->set_size( 20 );
-		$fmt->{app_title}->set_color( 'black' );
-		$fmt->{app_title}->set_bg_color( 'white' );
-		$fmt->{app_title}->set_top( 2 );
-		$fmt->{app_title}->set_right( 2 );
-
-	$fmt->{app_author} = $WB->add_format( bold => 1);
-		$fmt->{app_author}->set_size( 20 );
-		$fmt->{app_author}->set_color( 'black' );
-		$fmt->{app_author}->set_bg_color( 'white' );
-		$fmt->{app_author}->set_right( 2 );
-
-	$fmt->{app_description} = $WB->add_format( bold => 0);
-		$fmt->{app_description}->set_size( 13 );
-		$fmt->{app_description}->set_text_wrap( 1 );
-		$fmt->{app_description}->set_align( 'vjustify' );
-		$fmt->{app_description}->set_align( 'top' );
-		$fmt->{app_description}->set_color( 'black' );
-		$fmt->{app_description}->set_bg_color( 'white' );
-		$fmt->{app_description}->set_right( 2 );
-		$fmt->{app_description}->set_bottom( 2 );
-
-	$fmt->{app_logo} = $WB->add_format( bold => 0);
-		$fmt->{app_logo}->set_text_wrap( 1 );
-		$fmt->{app_logo}->set_align( 'vcenter' );
-		$fmt->{app_logo}->set_top( 2 );
-		$fmt->{app_logo}->set_left( 2 );
-		$fmt->{app_logo}->set_right( 2 );
-		$fmt->{app_logo}->set_bottom( 2 );
-		#$fmt->{app_logo}->set_center_across( 1 );
-
-	$fmt->{section} = $WB->add_format( bold => 1);
-		$fmt->{section}->set_size( 16);
-		$fmt->{section}->set_color( 'white' );
-		$fmt->{section}->set_bg_color( 'blue' );
-		
-	$fmt->{sub_sect} = $WB->add_format( bold => 1);
-		$fmt->{sub_sect}->set_size( 13 );
-		$fmt->{sub_sect}->set_color( 'white' );
-		$fmt->{sub_sect}->set_bg_color( 23 );
-
-	$fmt->{conversation} = $WB->add_format( bold => 1);
-		$fmt->{conversation}->set_size( 12 );
-		$fmt->{conversation}->set_color( 'black' );
-		$fmt->{conversation}->set_bg_color( $lt_grey );
-		$fmt->{conversation}->set_top( 2 );
-	$fmt->{conversation_index} = $WB->add_format( bold => 1, align => 'center', valign => 'top');
-		$fmt->{conversation_index}->set_top( 2 );
-		$fmt->{conversation_index}->set_left( 2 );
-	$fmt->{conversation_footer} = $WB->add_format( bold => 1);
-		$fmt->{conversation_footer}->set_top( 2 );
-	$fmt->{conversation_right_frame} = $WB->add_format( bold => 1, align => 'right', valign => 'top');
-		$fmt->{conversation_right_frame}->set_top( 2 );
-		$fmt->{conversation_right_frame}->set_right( 2 );
-
-	$fmt->{title_lt} = $WB->add_format( bold => 0);
-		$fmt->{title_lt}->set_color( 'gray' );
-
-	$fmt->{whois} = $WB->add_format( bold => 0, align => 'left', valign => 'top');
-		$fmt->{whois}->set_text_wrap();
-
-	$fmt->{title}  = $WB->add_format( bold => 1);
-
-	$fmt->{bold}   = $WB->add_format( bold => 1);
-
-	$fmt->{normal} = $WB->add_format( bold => 0, align => 'left', valign => 'top');
-
-	$fmt->{wrap}   = $WB->add_format( text_wrap => 1, align => 'left', valign => 'top');
-	$fmt->{wrap_c} = $WB->add_format( text_wrap => 1, align => 'left', valign => 'top');
-		$fmt->{wrap_c}->set_align('vjustify');
-	
-	return;
 }
 
 # =============================
