@@ -43,6 +43,7 @@ sub new {
 	return bless ($self, $class); #this is what makes a reference into an object
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  Write the Report 
 # +
@@ -106,7 +107,6 @@ sub _summary {
 
 	# Add banner
 	$sum_ws->set_row(0,32);
-	
 	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{banner});
 	$sum_ws->write_string($block_start,0,'AppDetex App Interrogation Report',$fmt->{banner});
 
@@ -144,6 +144,12 @@ sub _summary {
 	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Aprox Downloads ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{downloads},$fmt->{info_large});
 
+	#  Add the Content Stream Origination data
+	
+	$sum_ws->set_row(++$block_start,26);
+	$sum_ws->merge_range($block_start,0,$block_start,14,'Content Stream Origination',$fmt->{info_head_dk});
+	$self->_insert_content_stream_origination(\$sum_ws,$block_start);
+	
 	return;
 }
 
@@ -216,6 +222,7 @@ sub _network_analysis {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  Conversations
 # + 
@@ -256,7 +263,8 @@ sub _conversations_general {
 	$ws->set_column(4,5,75);
 	$ws->set_column(6,7,2);
 
-	# Add header
+	# Add banner
+	$ws->set_row(0,32);
 	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
 	$ws->write_string(0,0,sprintf('Network Conversations for     %s',$self->{title}),$fmt->{banner});
 
@@ -281,6 +289,7 @@ sub _conversations_general {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +   Traffic with a content type the indicates it's likely to be media
 # +
@@ -301,7 +310,8 @@ sub _conversations_media {
 	$ws->set_column(4,5,75);
 	$ws->set_column(6,7,2);
 
-	# Add header
+	# Add banner
+	$ws->set_row(0,32);
 	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
 	$ws->write_string(0,0,sprintf('Audio / Video Conversations for     %s' ,$self->{title}),$fmt->{banner});
 
@@ -326,6 +336,7 @@ sub _conversations_media {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +   Traffic with a content type the indicates it's likely to be media
 # +
@@ -346,7 +357,8 @@ sub _conversations_payload {
 	$ws->set_column(4,5,75);
 	$ws->set_column(6,7,2);
 
-	# Add header
+	# Add banner
+	$ws->set_row(0,32);
 	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
 	$ws->write_string(0,0,sprintf('Payload Typical Conversations for     %s',$self->{title}),$fmt->{banner});
 
@@ -372,7 +384,25 @@ sub _conversations_payload {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +
+# +  insert media conversation types 
+# +
+sub _insert_content_stream_origination {
+	my($self,$ws,$current_row) = @_;
+	my @convs = @{$self->{CONVS}{MEDIA}};  # localize array, just because 
+	return unless scalar(@convs);
 
+	# Start to loop through the items
+	foreach my $conv (@convs){
+		# process each element
+		$current_row = $self->_add_stream_origination($ws,$current_row,$conv);  # add to worksheet and return how much space it used
+	}
+
+	return;
+}
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  insert traffic types
 # +
@@ -409,6 +439,7 @@ sub _insert_traffic_data_types {
 	return $type_row_1;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  insert traffic destinations 
 # +
@@ -447,6 +478,7 @@ sub _insert_traffic_data_destinations {
 	return $type_row_1;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  insert traffic destinations 
 # +
@@ -485,6 +517,7 @@ sub _insert_traffic_data_hostnames {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  insert traffic types
 # +
@@ -529,6 +562,45 @@ sub _insert_traffic_data_media {
 	return $type_row_1;
 }
 
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +
+# +  Create and add the Media Stream Origination Block 
+# +
+sub _add_stream_origination($ws,$current_row,$conv) {
+	my($self,$ws,$row,$conv) = @_;
+
+	# RULE, no URL, no show
+	return 0 unless $conv->{'url'};
+
+	$self->{GEO}->go($conv->{dest_ip});
+	my $domain       = $self->{WHO}->whois_domain() || $conv->{host}; 
+	my $destip       = $conv->{dest_ip};
+	my $ip_geoloc    = $self->{GEO}->get_country();
+
+	# Add it
+	$$ws->merge_range(++$row,0,$row,1,'Content Type ',$fmt->{stream_label});
+	$$ws->merge_range($row,2,$row,14,$conv->{'Content-Type'}||'',$fmt->{stream_text});
+
+	$$ws->merge_range(++$row,0,$row,1,'IP Address ',$fmt->{stream_label});
+	$$ws->merge_range($row,2,$row,14,lc($destip||''),$fmt->{stream_text});
+
+	$$ws->merge_range(++$row,0,$row,1,'Host Name ',$fmt->{stream_label});
+	$$ws->merge_range($row,2,$row,14,lc($domain||''),$fmt->{stream_text});
+
+	$$ws->merge_range(++$row,0,$row,1,'Stream URL ',$fmt->{stream_label});
+	$$ws->merge_range($row,2,$row,14,$conv->{'url'}||'',$fmt->{stream_text});
+
+	$$ws->merge_range(++$row,0,$row,1,'Geo Location ',$fmt->{stream_label});
+	$$ws->merge_range($row,2,$row,14,$ip_geoloc,$fmt->{stream_text});
+
+	$$ws->set_row(++$row,2);
+	$$ws->merge_range($row,0,$row,14,'',$fmt->{break});
+
+	return $row;
+}
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  Create and add the Conversation Block
 # +
@@ -595,6 +667,7 @@ sub _add_conversation($ws,$current_row,$conv) {
 	return $ru+1;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +
 # +  Create and add the Conversation Payload Special 
@@ -663,6 +736,7 @@ sub _add_conversation_payload($ws,$current_row,$conv) {
 	return $ru+1;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # + DNS Worksheet
 # +
@@ -673,7 +747,8 @@ sub _add_dns {
 	my $ws = $self->{WB}->add_worksheet( 'Hostnames & Whois' );
 	$ws->set_tab_color('blue');
 
-	# Add header
+	# Add banner
+	$ws->set_row(0,32);
 	my $title = sprintf('Hostnames Resolved by  %s',$self->{banner});
 	$ws->merge_range(0,0,0,7,$title,$fmt->{banner});
 
@@ -725,6 +800,7 @@ sub _add_dns {
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # + IP Geo Info 
 # +
@@ -735,13 +811,15 @@ sub _add_ipgeo {
 	my $ws = $self->{WB}->add_worksheet( 'IP Geographic Location' );
 	$ws->set_tab_color('blue');
 
-	# Add header
+	# Add banner
+	$ws->set_row(0,32);
 	my $title = sprintf('IPs Related to  %s',$self->{banner});
 	$ws->merge_range(0,0,0,7,$title,$fmt->{banner});
 
 	return;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  Process the Conversations
 # +
@@ -800,6 +878,7 @@ sub _process_conversations {
 	};
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +
 # +
@@ -814,6 +893,7 @@ sub _popularity {
 	return \@sorted; 
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  format the filename, hack of pcap parts
 # +
@@ -827,6 +907,7 @@ sub _format_filename {
 	return $filename;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +
 # +
@@ -841,6 +922,7 @@ sub _consolidate_hosts {
 	return $HOSTS;
 }
 
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
 # +  --  defines a CRUDE text wrapping strategy
 # +
@@ -853,5 +935,7 @@ sub _make_wrappy {
 	return wrap('','',$str);
 }
 
-# =============================
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++++++++++  E  N  D  ++++++++++++++++++++++++++++++++++++++
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 1;

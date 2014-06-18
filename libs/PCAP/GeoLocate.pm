@@ -88,6 +88,14 @@ sub get_data {
 # +
 # +  --  accept filename and process into data profiles
 # +
+sub get_country {
+	my($self) = @_;
+	return $self->{DATA}{country}||'~unknown~';
+}
+
+# +
+# +  --  accept filename and process into data profiles
+# +
 sub get_mojo_text_all {
 	my($self) = @_;
 	return $self->{TEXT};

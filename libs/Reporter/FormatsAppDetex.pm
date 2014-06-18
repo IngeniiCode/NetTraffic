@@ -24,6 +24,7 @@ sub set_formatting {
 		'group_head'     => $WB->set_custom_color( 43, 128, 128, 128 ),
 		'col_head'       => 'white',
 		'conversation'   => $WB->set_custom_color( 44, 218, 218, 218 ),
+		'stream_label'   => 'white',
 	};
 	my $fg_colors = {
 		'banner'         => 'white',
@@ -36,6 +37,7 @@ sub set_formatting {
 		'group_head'     => 'white',
 		'col_head'       => $bg_colors->{info_head_dk},
 		'conversation'   => $bg_colors->{info_head_dk},
+		'steam_label'    => $bg_colors->{info_head_dk},
 	};
 
 	#
@@ -115,6 +117,20 @@ sub set_formatting {
 		$fmt->{col_head}->set_align( 'left' );
 		$fmt->{col_head}->set_align( 'bottom' );
 
+	$fmt->{stream_label} = $WB->add_format( bold => 1 );
+		$fmt->{stream_label}->set_size( 12 );
+		$fmt->{stream_label}->set_color( $fg_colors->{stream_label} );
+		$fmt->{stream_label}->set_align( 'right' );
+		$fmt->{stream_label}->set_align( 'top' );
+		$fmt->{stream_label}->set_right( 2 );
+		$fmt->{stream_label}->set_border_color( $bg_colors->{stream_label} );	
+	
+	$fmt->{stream_text} = $WB->add_format( bold => 0 );
+		$fmt->{stream_text}->set_size( 12 );
+		$fmt->{stream_text}->set_color( $fg_colors->{normal} );
+		$fmt->{stream_text}->set_align( 'left' );
+		$fmt->{stream_text}->set_align( 'top' );
+
 	$fmt->{normal} = $WB->add_format( bold => 0 );
 		$fmt->{normal}->set_size( 11 );
 		$fmt->{normal}->set_color( $fg_colors->{normal} );
@@ -134,6 +150,10 @@ sub set_formatting {
 	$fmt->{conversation_right_frame} = $WB->add_format( bold => 1, align => 'right', valign => 'top');
 		$fmt->{conversation_right_frame}->set_top( 2 );
 		$fmt->{conversation_right_frame}->set_right( 2 );
+
+	$fmt->{break} = $WB->add_format( bold => 0 );
+		$fmt->{break}->set_size( -1 );
+		$fmt->{break}->set_bottom( 2 );
 
 	$fmt->{whois} = $WB->add_format( bold => 0, align => 'left', valign => 'top');
 		$fmt->{whois}->set_text_wrap();
