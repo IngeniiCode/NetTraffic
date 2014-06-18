@@ -10,6 +10,7 @@ use PCAP::Whois;
 use PCAP::ContentType;
 use File::Basename;
 use Text::Wrap;
+use Image::Size;
 use Reporter::FormatsAppDetex;
 use Data::Dumper;
 # - - - - - - - - - - - - - - - 
@@ -54,15 +55,21 @@ sub write_report {
 	# Process the report data
 	$self->_process_conversations();
 
-printf("CONVS %s\n",Dumper $self->{CONVS});
+#printf("CONVS %s\n",Dumper $self->{CONVS});
 
 	# Write the report information
 	$self->_summary();
 
-#	$self->_conversations_media();
-#	$self->_conversations_payload();
-#	$self->_conversations_general();
-#	$self->_add_dns();
+	$self->_network_analysis();
+
+	$self->_conversations_media();
+
+	$self->_conversations_payload();
+
+	$self->_conversations_general();
+
+	$self->_add_dns();
+
 #	$self->_add_ipgeo();
 #	#$self->_traffic_host();
 #	#$self->_traffic_url();
@@ -88,6 +95,8 @@ sub _summary {
 	my $block_end   = 0;
 	my $next_block_start = 0;
 	my $temp;
+	my $x_factor    = 0.3;
+	my $target_px   = 115;   #target pixel width
 
 	$sum_ws->set_tab_color( 'green' );	
 
@@ -97,6 +106,7 @@ sub _summary {
 
 	# Add banner
 	$sum_ws->set_row(0,32);
+	
 	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{banner});
 	$sum_ws->write_string($block_start,0,'AppDetex App Interrogation Report',$fmt->{banner});
 
@@ -115,8 +125,12 @@ sub _summary {
 	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Description ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start+1,14,$self->{desc},$fmt->{info_desc});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'',$fmt->{info_label});
-	$sum_ws->insert_image($block_start,0,$self->{logo},5,5,0.5,0.5);
+	# image add and manipulation
+	my ($img_x,$img_y) = imgsize($self->{logo});
+	$x_factor = ($target_px / ($img_x+1));  # why the +1 ? simply to prevent a division by 0 error
+	$sum_ws->set_row(++$block_start,95);  # set the cell height to some semi-reasonable amount.
+	$sum_ws->merge_range($block_start,0,$block_start,1,'',$fmt->{info_label});
+	$sum_ws->insert_image($block_start,0,$self->{logo},5,5,$x_factor,$x_factor);
 
 	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Store ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{store},$fmt->{info_large});
@@ -130,44 +144,63 @@ sub _summary {
 	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Aprox Downloads ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{downloads},$fmt->{info_large});
 
-#	$block_end = $block_start + 2;  # base of block
-#	$sum_ws->merge_range($block_start,0,$block_end,1,'',$fmt->{app_logo}); 
-#	$sum_ws->insert_image($block_start,0, $self->{logo},5,5,0.5,0.5);
+	return;
+}
 
-#	$sum_ws->merge_range($block_start,2,$block_start,14,'Title: '.$self->{title},$fmt->{app_title});
-#	$sum_ws->merge_range(++$block_start,2,$block_start,14,'Author: '.$self->{author},$fmt->{app_author});
-#	#$sum_ws->merge_range(++$block_start,2,$block_end,14,_make_wrappy($self->{desc}),$fmt->{app_description});
-#	$sum_ws->merge_range(++$block_start,2,$block_end,14,$self->{desc},$fmt->{app_description});
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +
+# +  Network Analysis 
+# +
+sub _network_analysis {
+	my ($self) = @_;
 
-#	# Conversation Information
-#	$block_start += 2;
-#	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{section});
-#	$sum_ws->write_string($block_start,0,sprintf(' %d  Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
+	my $neta_ws  = $self->{WB}->add_worksheet( 'Network Analysis' );
 
-#	# Groupings
-#	$next_block_start = $block_start + 2;
-#	if($temp = $self->_insert_traffic_data_types(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
-#		$block_start = ($temp > $block_start) ? $temp : $block_start;
-#	}
-#	if($temp = $self->_insert_traffic_data_destinations(\$sum_ws,$next_block_start,5,8)) {  # send worksheet, and starting co-ordinate and columns
-#		$block_start = ($temp > $block_start) ? $temp : $block_start;
-#	}
-#	if($temp = $self->_insert_traffic_data_hostnames(\$sum_ws,$next_block_start,10,14)) {  # send worksheet, and starting co-ordinate and columns
-#		$block_start = ($temp > $block_start) ? $temp : $block_start;
-#	}
-#
-#	# Next block of items
-#	$next_block_start = $block_start + 2;  # leave some space before next block
-#
-#	if($temp = $self->_insert_traffic_data_media(\$sum_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
-#		$block_start = ($temp > $block_start) ? $temp : $block_start;
-#	}
-#
-#	# Next block of items
-#	$next_block_start = $block_start + 2;  # leave some space before next block
-#
-#	return;
-#
+	my $block_start = 0;
+	my $block_end   = 0;
+	my $next_block_start = 0;
+	my $temp;
+
+	$neta_ws->set_tab_color( 'red' );	
+
+	# Set column widths
+	$neta_ws->set_column(4,4,3);
+	$neta_ws->set_column(9,9,3);
+
+	# Add banner
+	$neta_ws->set_row(0,32);
+	$neta_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{banner});
+	$neta_ws->write_string($block_start,0,sprintf('Network Analysis Summary for     %s',$self->{title}),$fmt->{banner});
+
+	# Conversation Information
+	$block_start += 2;
+	$neta_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{section_head});
+	$neta_ws->write_string($block_start,0,sprintf(' %d  Network Conversations with Remote Servers',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section_head});
+
+	# Groupings
+	$next_block_start = $block_start + 2;
+	if($temp = $self->_insert_traffic_data_types(\$neta_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
+		$block_start = ($temp > $block_start) ? $temp : $block_start;
+	}
+	if($temp = $self->_insert_traffic_data_destinations(\$neta_ws,$next_block_start,5,8)) {  # send worksheet, and starting co-ordinate and columns
+		$block_start = ($temp > $block_start) ? $temp : $block_start;
+	}
+	if($temp = $self->_insert_traffic_data_hostnames(\$neta_ws,$next_block_start,10,14)) {  # send worksheet, and starting co-ordinate and columns
+		$block_start = ($temp > $block_start) ? $temp : $block_start;
+	}
+
+	# Next block of items
+	$next_block_start = $block_start + 2;  # leave some space before next block
+
+	if($temp = $self->_insert_traffic_data_media(\$neta_ws,$next_block_start,0,4)) {  # send worksheet, and starting co-ordinate and columns
+		$block_start = ($temp > $block_start) ? $temp : $block_start;
+	}
+
+	# Next block of items
+	$next_block_start = $block_start + 2;  # leave some space before next block
+
+	return;
+
 #	# Add frames summary
 #	$sum_ws->merge_range(1,1,1,3,'',$fmt->{normal});
 #	$sum_ws->write_string(1,0,"Frames",$fmt->{bold});
@@ -179,7 +212,7 @@ sub _summary {
 #	$sum_ws->write_string(3,0,"Stop time",$fmt->{bold});
 #	$sum_ws->merge_range(3,1,3,3,'',$fmt->{normal});
 #	$sum_ws->write_string(3,1,$self->{REPORT}->{stop_time}||'',$fmt->{normal});
-#
+
 	return;
 }
 
@@ -224,20 +257,20 @@ sub _conversations_general {
 	$ws->set_column(6,7,2);
 
 	# Add header
-	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Network Conversations for %s',$self->{title}),$fmt->{header});
+	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
+	$ws->write_string(0,0,sprintf('Network Conversations for     %s',$self->{title}),$fmt->{banner});
 
 	# Conversation Information
-	$ws->merge_range(2,0,2,7,'',$fmt->{section});
-	$ws->write_string(2,0,sprintf(' %d  Network Conversations',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section});
+	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
+	$ws->write_string(2,0,sprintf(' %d  Network Conversations',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section_head});
 
 	# Top Row Headings
-	$ws->write_string(3,0,'Convrs.',$fmt->{title});
-	$ws->write_string(3,1,'IP Address',$fmt->{title});
-	$ws->write_string(3,2,'Hostname',$fmt->{title});
-	$ws->write_string(3,3,'Content-Type',$fmt->{title});
-	$ws->merge_range(3,4,3,5,'',$fmt->{title});
-	$ws->write_string(3,4,'URL',$fmt->{title});
+	$ws->write_string(3,0,'Convrs.',$fmt->{col_head});
+	$ws->write_string(3,1,'IP Address',$fmt->{col_head});
+	$ws->write_string(3,2,'Hostname',$fmt->{col_head});
+	$ws->write_string(3,3,'Content-Type',$fmt->{col_head});
+	$ws->merge_range(3,4,3,5,'',$fmt->{col_head});
+	$ws->write_string(3,4,'URL',$fmt->{col_head});
 
 	# Start to loop through the items
 	foreach my $conv (@convs){
@@ -269,20 +302,20 @@ sub _conversations_media {
 	$ws->set_column(6,7,2);
 
 	# Add header
-	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Audio / Video Conversations for %s' ,$self->{title}),$fmt->{header});
+	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
+	$ws->write_string(0,0,sprintf('Audio / Video Conversations for     %s' ,$self->{title}),$fmt->{banner});
 
 	# Conversation Information
-	$ws->merge_range(2,0,2,7,'',$fmt->{section});
-	$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section});
+	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
+	$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section_head});
 
 	# Top Row Headings
-	$ws->write_string(3,0,'Convrs.',$fmt->{title});
-	$ws->write_string(3,1,'IP Address',$fmt->{title});
-	$ws->write_string(3,2,'Hostname',$fmt->{title});
-	$ws->write_string(3,3,'Content-Type',$fmt->{title});
-	$ws->merge_range(3,4,3,5,'',$fmt->{title});
-	$ws->write_string(3,4,'URL',$fmt->{title});
+	$ws->write_string(3,0,'Convrs.',$fmt->{col_head});
+	$ws->write_string(3,1,'IP Address',$fmt->{col_head});
+	$ws->write_string(3,2,'Hostname',$fmt->{col_head});
+	$ws->write_string(3,3,'Content-Type',$fmt->{col_head});
+	$ws->merge_range(3,4,3,5,'',$fmt->{col_head});
+	$ws->write_string(3,4,'URL',$fmt->{col_head});
 
 	# Start to loop through the items
 	foreach my $conv (@convs){
@@ -314,21 +347,21 @@ sub _conversations_payload {
 	$ws->set_column(6,7,2);
 
 	# Add header
-	$ws->merge_range(0,0,0,7,'',$fmt->{header});
-	$ws->write_string(0,0,sprintf('Payload Typical Conversations for %s',$self->{title}),$fmt->{header});
+	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
+	$ws->write_string(0,0,sprintf('Payload Typical Conversations for     %s',$self->{title}),$fmt->{banner});
 
 	# Conversation Information
-	$ws->merge_range(2,0,2,7,'',$fmt->{section});
-	#$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section});
-	$ws->write_string(2,0,'Discovered Payloads',$fmt->{section});
+	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
+	#$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section_head});
+	$ws->write_string(2,0,'Discovered Payloads',$fmt->{section_head});
 
 	# Top Row Headings
-	$ws->write_string(3,0,'Convrs.',$fmt->{title});
-	$ws->write_string(3,1,'IP Address',$fmt->{title});
-	$ws->write_string(3,2,'Hostname',$fmt->{title});
-	$ws->write_string(3,3,'Content-Type',$fmt->{title});
-	$ws->merge_range(3,4,3,5,'',$fmt->{title});
-	$ws->write_string(3,4,'URL',$fmt->{title});
+	$ws->write_string(3,0,'Convrs.',$fmt->{col_head});
+	$ws->write_string(3,1,'IP Address',$fmt->{col_head});
+	$ws->write_string(3,2,'Hostname',$fmt->{col_head});
+	$ws->write_string(3,3,'Content-Type',$fmt->{col_head});
+	$ws->merge_range(3,4,3,5,'',$fmt->{col_head});
+	$ws->write_string(3,4,'URL',$fmt->{col_head});
 
 	# Start to loop through the items
 	foreach my $conv (@convs){
@@ -355,12 +388,12 @@ sub _insert_traffic_data_types {
 	my $top = ($total_types <= 10) ? $total_types : 10;
 	my $title = sprintf('Top %d of %d Communication Methods',$top,$total_types);
 
-	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+3,$title,$fmt->{sub_sect});
+	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+3,$title,$fmt->{group_head});
 	$row_start++;
 
 	# add the titles
-	$$ws->write_string($row_start,$col_start,'Transfers',$fmt->{title});
-	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'Service Type',$fmt->{title});
+	$$ws->write_string($row_start,$col_start,'Transfers',$fmt->{col_head});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'Service Type',$fmt->{col_head});
 
 	my $type_row_1 = $row_start + 1;
 
@@ -391,11 +424,11 @@ sub _insert_traffic_data_destinations {
 	my $top = ($total_types <= 10) ? $total_types : 10;
 	my $title = sprintf('Top %d of %d Frequented IPs',$top,$total_types);
 
-	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+3,$title,$fmt->{sub_sect});
+	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+3,$title,$fmt->{group_head});
 	
 	# add the titles
-	$$ws->write_string(++$row_start,$col_start,'Transfers',$fmt->{title});
-	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'IP Address',$fmt->{title});
+	$$ws->write_string(++$row_start,$col_start,'Transfers',$fmt->{col_head});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+3,'IP Address',$fmt->{col_head});
 
 	my $type_row_1 = $row_start + 1;
 
@@ -430,12 +463,12 @@ sub _insert_traffic_data_hostnames {
 	my $title = sprintf('Top %d of %d Frequented Hostnames',$top,$total_hosts);
 	my $type_row_1 = $row_start + 1;
 
-	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+4,$title,$fmt->{sub_sect});
+	$$ws->merge_range($row_start,$col_start,$row_start,$col_start+4,$title,$fmt->{group_head});
 	
 	# add the titles
-	$$ws->write_string(++$row_start,$col_start,'Transfers',$fmt->{title});
-	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+4,'Hostname',$fmt->{title});
-#	$$ws->write_string($row_start,$col_start+1,'Hostname',$fmt->{title});
+	$$ws->write_string(++$row_start,$col_start,'Transfers',$fmt->{col_head});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+4,'Hostname',$fmt->{col_head});
+#	$$ws->write_string($row_start,$col_start+1,'Hostname',$fmt->{col_head});
 
 	my $type_row_1 = $row_start + 1;
 
@@ -473,16 +506,16 @@ sub _insert_traffic_data_media {
 
 	my $title = sprintf('%d Media File Types Discovered',scalar(keys %$file_sizes));
 
-	$$ws->merge_range($row_start,$col_start,$row_start,14,$title,$fmt->{section});
+	$$ws->merge_range($row_start,$col_start,$row_start,14,$title,$fmt->{section_head});
 	$row_start += 2; #shimit
 	
-	$$ws->merge_range($row_start,$col_start,$row_start,6,'Media Type Transfers',$fmt->{sub_sect});
+	$$ws->merge_range($row_start,$col_start,$row_start,6,'Media Type Transfers',$fmt->{group_head});
 	$row_start++; #shimit
 
 	# add the titles
-	$$ws->write_string($row_start,$col_start,'Bytes',$fmt->{title});
-	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+2,'Related Host',$fmt->{title});
-	$$ws->merge_range($row_start,$col_start+3,$row_start,$col_start+6,'Filename',$fmt->{title});
+	$$ws->write_string($row_start,$col_start,'Bytes',$fmt->{col_head});
+	$$ws->merge_range($row_start,$col_start+1,$row_start,$col_start+2,'Related Host',$fmt->{col_head});
+	$$ws->merge_range($row_start,$col_start+3,$row_start,$col_start+6,'Filename',$fmt->{col_head});
 
 	my $type_row_1 = $row_start + 1;
 
@@ -641,8 +674,8 @@ sub _add_dns {
 	$ws->set_tab_color('blue');
 
 	# Add header
-	my $title = sprintf('Hostnames Resolved by  %s',$self->{title});
-	$ws->merge_range(0,0,0,7,$title,$fmt->{header});
+	my $title = sprintf('Hostnames Resolved by  %s',$self->{banner});
+	$ws->merge_range(0,0,0,7,$title,$fmt->{banner});
 
 	# Set column widths
 	$ws->set_column(0,0,35); 
@@ -655,18 +688,18 @@ sub _add_dns {
 
 	# Add headers
 	# - pretty
-	$ws->merge_range(2,0,2,1,'Hostname Info',$fmt->{sub_sect});  
-	$ws->merge_range(2,3,2,8,'Whois Info',$fmt->{sub_sect}); 
+	$ws->merge_range(2,0,2,1,'Hostname Info',$fmt->{section_head});  
+	$ws->merge_range(2,3,2,8,'Whois Info',$fmt->{section_head}); 
 
 	# - column
-	$ws->write_string(3,0,'Hostname',$fmt->{title});
-	$ws->write_string(3,1,'IP Addresses Used',$fmt->{title});
-        $ws->write_string(3,2,'',$fmt->{title});
-        $ws->write_string(3,3,'Whois Domain',$fmt->{title});
-        $ws->write_string(3,4,'Registrar',$fmt->{title});
-        $ws->write_string(3,5,'Registrant',$fmt->{title});
-        $ws->write_string(3,6,'Emails',$fmt->{title});
-        $ws->write_string(3,7,'Name Servers',$fmt->{title});
+	$ws->write_string(3,0,'Hostname',$fmt->{col_head});
+	$ws->write_string(3,1,'IP Addresses Used',$fmt->{col_head});
+        $ws->write_string(3,2,'',$fmt->{col_head});
+        $ws->write_string(3,3,'Whois Domain',$fmt->{col_head});
+        $ws->write_string(3,4,'Registrar',$fmt->{col_head});
+        $ws->write_string(3,5,'Registrant',$fmt->{col_head});
+        $ws->write_string(3,6,'Emails',$fmt->{col_head});
+        $ws->write_string(3,7,'Name Servers',$fmt->{col_head});
 
 	# Add the Hostname Translation  cols A & B
 	my $HOSTS   = $self->_consolidate_hosts();
@@ -703,10 +736,8 @@ sub _add_ipgeo {
 	$ws->set_tab_color('blue');
 
 	# Add header
-	my $title = sprintf('IPs Related to  %s',$self->{title});
-	$ws->merge_range(0,0,0,7,$title,$fmt->{header});
-
-
+	my $title = sprintf('IPs Related to  %s',$self->{banner});
+	$ws->merge_range(0,0,0,7,$title,$fmt->{banner});
 
 	return;
 }
