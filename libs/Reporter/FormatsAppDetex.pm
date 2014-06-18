@@ -20,6 +20,7 @@ sub set_formatting {
 		'info_label'     => 'white', 
 		'info_app_title' => 'white',
 		'info_lage'      => 'white',
+		'info_large_num' => 'white',
 		'section_head'   => $WB->set_custom_color( 42, 89, 89, 89 ),
 		'group_head'     => $WB->set_custom_color( 43, 128, 128, 128 ),
 		'col_head'       => 'white',
@@ -33,6 +34,7 @@ sub set_formatting {
 		'info_label'     => $bg_colors->{info_head_dk},
 		'info_app_title' => $bg_colors->{info_head_dk},
 		'info_large'     => $bg_colors->{info_head_dk},
+		'info_large_num' => $bg_colors->{info_head_dk},
 		'section_head'   => 'white',
 		'group_head'     => 'white',
 		'col_head'       => $bg_colors->{info_head_dk},
@@ -87,6 +89,8 @@ sub set_formatting {
 		$fmt->{info_large}->set_color( $fg_colors->{info_large} );
 		$fmt->{info_large}->set_align( 'left' );
 		$fmt->{info_large}->set_align( 'top' );
+	$fmt->{info_large_num} = $fmt->{info_large};  # clone
+		$fmt->{info_large_num}->set_num_format( '#,##0' );
 
 	$fmt->{info_desc} = $WB->add_format( bold => 0 );
 		$fmt->{info_desc}->set_size( 12 );
@@ -152,8 +156,8 @@ sub set_formatting {
 		$fmt->{conversation_right_frame}->set_right( 2 );
 
 	$fmt->{break} = $WB->add_format( bold => 0 );
-		$fmt->{break}->set_size( -1 );
-		$fmt->{break}->set_bottom( 2 );
+		$fmt->{break}->set_size( 2 );
+		$fmt->{break}->set_bottom( 1 );
 
 	$fmt->{whois} = $WB->add_format( bold => 0, align => 'left', valign => 'top');
 		$fmt->{whois}->set_text_wrap();

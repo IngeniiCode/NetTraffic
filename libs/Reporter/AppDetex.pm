@@ -113,16 +113,16 @@ sub _summary {
 	# Content for Investigation 
 	$block_start += 2;
 	$sum_ws->set_row($block_start,26);
-	$sum_ws->merge_range($block_start,0,$block_start,3,'Content for Investigation',$fmt->{info_head_dk});
+	$sum_ws->merge_range($block_start,0,$block_start,3,'App Interrogated: ',$fmt->{info_head_dk});
 	$sum_ws->merge_range($block_start,4,$block_start,14,$self->{title},$fmt->{info_head_lt});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'App Title ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'App Title: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{title},$fmt->{info_app_title});
 		
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Publisher ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Publisher: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{publisher},$fmt->{info_large});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Description ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Description: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start+1,14,$self->{desc},$fmt->{info_desc});
 
 	# image add and manipulation
@@ -132,22 +132,22 @@ sub _summary {
 	$sum_ws->merge_range($block_start,0,$block_start,1,'',$fmt->{info_label});
 	$sum_ws->insert_image($block_start,0,$self->{logo},5,5,$x_factor,$x_factor);
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Store ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Store: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{store},$fmt->{info_large});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Price ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Price: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{price},$fmt->{info_large});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Category ',$fmt->{info_label});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Category: ',$fmt->{info_label});
 	$sum_ws->merge_range($block_start,2,$block_start,14,ucfirst($self->{category}),$fmt->{info_large});
 
-	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Aprox Downloads ',$fmt->{info_label});
-	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{downloads},$fmt->{info_large});
+	$sum_ws->merge_range(++$block_start,0,$block_start,1,'Aprox Downloads: ',$fmt->{info_label});
+	$sum_ws->merge_range($block_start,2,$block_start,14,$self->{downloads},$fmt->{info_large_num});
 
 	#  Add the Content Stream Origination data
 	
 	$sum_ws->set_row(++$block_start,26);
-	$sum_ws->merge_range($block_start,0,$block_start,14,'Content Stream Origination',$fmt->{info_head_dk});
+	$sum_ws->merge_range($block_start,0,$block_start,14,'Origination of Streaming Content',$fmt->{info_head_dk});
 	$self->_insert_content_stream_origination(\$sum_ws,$block_start);
 	
 	return;
@@ -170,6 +170,7 @@ sub _network_analysis {
 	$neta_ws->set_tab_color( 'red' );	
 
 	# Set column widths
+	$neta_ws->set_column(0,0,0); # shrink to nothing
 	$neta_ws->set_column(4,4,3);
 	$neta_ws->set_column(9,9,3);
 
@@ -250,14 +251,15 @@ sub _network_analysis {
 sub _conversations_general {
 	my ($self) = @_;
 
-	my $ws  = $self->{WB}->add_worksheet( 'Conversations' );
+	my $ws  = $self->{WB}->add_worksheet( 'All Conversations' );
 	my @convs = @{$self->{CONVS}{ORDERED}};  # localize array, just because 
 	my $current_row = 4;  # row to start inserting the conversation blocks
 
 	$ws->set_tab_color( 'orange' );
 
         # Set column widths
-	$ws->set_column(0,0,6);
+	$ws->set_column(0,0,0); # shrink to nothing
+	#$ws->set_column(0,0,6);
 	$ws->set_column(1,1,16);
 	$ws->set_column(2,3,25);
 	$ws->set_column(4,5,75);
@@ -266,7 +268,7 @@ sub _conversations_general {
 	# Add banner
 	$ws->set_row(0,32);
 	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
-	$ws->write_string(0,0,sprintf('Network Conversations for     %s',$self->{title}),$fmt->{banner});
+	$ws->write_string(0,0,sprintf('All Network Conversations    %s',$self->{title}),$fmt->{banner});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
@@ -298,13 +300,14 @@ sub _conversations_media {
 	my @convs = @{$self->{CONVS}{MEDIA}};  # localize array, just because 
 	return unless scalar(@convs);
 
-	my $ws  = $self->{WB}->add_worksheet( 'Media' );
+	my $ws  = $self->{WB}->add_worksheet( 'Media Conversations' );
 	my $current_row = 4;  # row to start inserting the conversation blocks
 
 	$ws->set_tab_color( 'red' );
 
         # Set column widths
-	$ws->set_column(0,0,6);
+	$ws->set_column(0,0,0);  # shring to nothing
+	#$ws->set_column(0,0,6);
 	$ws->set_column(1,1,16);
 	$ws->set_column(2,3,25);
 	$ws->set_column(4,5,75);
@@ -313,7 +316,7 @@ sub _conversations_media {
 	# Add banner
 	$ws->set_row(0,32);
 	$ws->merge_range(0,0,0,7,'',$fmt->{banner});
-	$ws->write_string(0,0,sprintf('Audio / Video Conversations for     %s' ,$self->{title}),$fmt->{banner});
+	$ws->write_string(0,0,sprintf('Media Network Conversations    %s' ,$self->{title}),$fmt->{banner});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
@@ -351,7 +354,8 @@ sub _conversations_payload {
 	$ws->set_tab_color( 'red' );
 
         # Set column widths
-	$ws->set_column(0,0,6);
+	$ws->set_column(0,0,0);  # shrink to nothing
+	#$ws->set_column(0,0,6);
 	$ws->set_column(1,1,16);
 	$ws->set_column(2,3,25);
 	$ws->set_column(4,5,75);
@@ -508,7 +512,7 @@ sub _insert_traffic_data_hostnames {
 		for(my $i=0;$i<$top;$i++){
 			my $hostname = shift(@hosts);
 			$$ws->write_number($type_row_1,$col_start,$GrpHosts->{$hostname}||0);
-			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+4,$hostname||'',$fmt->{normal});
+			$$ws->merge_range($type_row_1,$col_start+1,$type_row_1,$col_start+4,$hostname||'[hostname not found]',$fmt->{normal});
 			# add more awesomenessd
 			$type_row_1++;
 		}
@@ -537,7 +541,7 @@ sub _insert_traffic_data_media {
 
 	return 0 unless scalar(keys %$file_sizes);
 
-	my $title = sprintf('%d Media File Types Discovered',scalar(keys %$file_sizes));
+	my $title = sprintf('%d Media Files Discovered',scalar(keys %$file_sizes));
 
 	$$ws->merge_range($row_start,$col_start,$row_start,14,$title,$fmt->{section_head});
 	$row_start += 2; #shimit
@@ -749,13 +753,13 @@ sub _add_dns {
 
 	# Add banner
 	$ws->set_row(0,32);
-	my $title = sprintf('Hostnames Resolved by  %s',$self->{banner});
+	my $title = sprintf('Hostnames Used in Network Conversations  %s',$self->{banner});
 	$ws->merge_range(0,0,0,7,$title,$fmt->{banner});
 
 	# Set column widths
 	$ws->set_column(0,0,35); 
 	$ws->set_column(1,1,15); 
-	$ws->set_column(2,2,2); 
+	$ws->set_column(2,2,0);  # try to shrink! 
 	$ws->set_column(3,3,25); 
 	$ws->set_column(4,4,50); 
 	$ws->set_column(5,5,50); 
@@ -763,8 +767,7 @@ sub _add_dns {
 
 	# Add headers
 	# - pretty
-	$ws->merge_range(2,0,2,1,'Hostname Info',$fmt->{section_head});  
-	$ws->merge_range(2,3,2,8,'Whois Info',$fmt->{section_head}); 
+	$ws->merge_range(2,0,2,8,'Hostname Information',$fmt->{section_head});  
 
 	# - column
 	$ws->write_string(3,0,'Hostname',$fmt->{col_head});
