@@ -40,6 +40,7 @@ sub go {
 	my ($self,$hostname) = @_;
 
 	chomp($hostname);
+printf("LOOKING FOR HOST: %s\n",$hostname);
 	# set hostname for later use in the cache
 	my $orig_host = $hostname;
 

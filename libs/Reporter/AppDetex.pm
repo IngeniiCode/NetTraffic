@@ -67,6 +67,8 @@ sub write_report {
 
 	$self->_conversations_payload();
 
+#	$self->_conversations_torrents();
+
 	$self->_conversations_general();
 
 	$self->_add_dns();
@@ -272,7 +274,7 @@ sub _conversations_general {
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section_head});
-	$ws->write_string(2,0,sprintf(' %d  Network Conversations',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section_head});
+	$ws->write_string(2,0,sprintf(' %d  Total Network Conversations',$self->{CONVS}{COUNTS}{conversations}),$fmt->{section_head});
 
 	# Top Row Headings
 	$ws->write_string(3,0,'Convrs.',$fmt->{col_head});
@@ -293,7 +295,8 @@ sub _conversations_general {
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # +
-# +   Traffic with a content type the indicates it's likely to be media
+# +   Traffic with a content type the indicates it's likely to
+# +   be media
 # +
 sub _conversations_media {
 	my ($self) = @_;
@@ -337,6 +340,55 @@ sub _conversations_media {
 	}
 
 	return;
+}
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +
+# +   Traffic with a content type the indicates it's likely to
+# +   be media
+# +
+sub _conversations_torrents {
+    my ($self) = @_;
+    my @convs = @{$self->{CONVS}{TORRENTS}};  # localize array, just because
+    return unless scalar(@convs);
+    
+    my $ws  = $self->{WB}->add_worksheet( 'BitTorrent Conversations' );
+    my $current_row = 4;  # row to start inserting the conversation blocks
+    
+    $ws->set_tab_color( 'red' );
+    
+    # Set column widths
+    $ws->set_column(0,0,0);  # shring to nothing
+    #$ws->set_column(0,0,6);
+    $ws->set_column(1,1,16);
+    $ws->set_column(2,3,25);
+    $ws->set_column(4,5,75);
+    $ws->set_column(6,7,2);
+    
+    # Add banner
+    $ws->set_row(0,32);
+    $ws->merge_range(0,0,0,7,'',$fmt->{banner});
+    $ws->write_string(0,0,sprintf('BitTorrent Conversations    %s' ,$self->{title}),$fmt->{banner});
+    
+    # Conversation Information
+    $ws->merge_range(2,0,2,7,'',$fmt->{section_head});
+    $ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section_head});
+    
+    # Top Row Headings
+    $ws->write_string(3,0,'Convrs.',$fmt->{col_head});
+    $ws->write_string(3,1,'IP Address',$fmt->{col_head});
+    $ws->write_string(3,2,'Hostname',$fmt->{col_head});
+    $ws->write_string(3,3,'Content-Type',$fmt->{col_head});
+    $ws->merge_range(3,4,3,5,'',$fmt->{col_head});
+    $ws->write_string(3,4,'URL',$fmt->{col_head});
+    
+    # Start to loop through the items
+    foreach my $conv (@convs){
+        # process each element
+        $current_row += $self->_add_conversation(\$ws,$current_row,$conv);  # add to worksheet and return how much space it used
+    }
+    
+    return;
 }
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -593,7 +645,8 @@ sub _add_stream_origination($ws,$current_row,$conv) {
 	$$ws->merge_range($row,2,$row,14,lc($domain||''),$fmt->{stream_text});
 
 	$$ws->merge_range(++$row,0,$row,1,'Stream URL ',$fmt->{stream_label});
-	$$ws->merge_range($row,2,$row,14,$conv->{'url'}||'',$fmt->{stream_text});
+	$$ws->merge_range($row,2,$row,14,'',$fmt->{stream_text});
+	$$ws->write_string($row,2,$conv->{'url'}||'',$fmt->{stream_text});
 
 	$$ws->merge_range(++$row,0,$row,1,'Geo Location ',$fmt->{stream_label});
 	$$ws->merge_range($row,2,$row,14,$ip_geoloc,$fmt->{stream_text});

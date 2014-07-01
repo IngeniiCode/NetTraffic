@@ -61,6 +61,7 @@ printf("CONVS %s\n",Dumper $self->{CONVS});
 	$self->_summary();
 
 	$self->_conversations_media();
+    $self->_conversations_torrents();
 	$self->_conversations_payload();
 	$self->_conversations_general();
 	$self->_add_dns();
@@ -242,6 +243,52 @@ sub _conversations_media {
 	# Add header
 	$ws->merge_range(0,0,0,7,'',$fmt->{header});
 	$ws->write_string(0,0,sprintf('Audio / Video Conversations for %s' ,$self->{title}),$fmt->{header});
+
+	# Conversation Information
+	$ws->merge_range(2,0,2,7,'',$fmt->{section});
+	$ws->write_string(2,0,sprintf(' %d  Network Conversations',scalar(@convs)),$fmt->{section});
+
+	# Top Row Headings
+	$ws->write_string(3,0,'Convrs.',$fmt->{title});
+	$ws->write_string(3,1,'IP Address',$fmt->{title});
+	$ws->write_string(3,2,'Hostname',$fmt->{title});
+	$ws->write_string(3,3,'Content-Type',$fmt->{title});
+	$ws->merge_range(3,4,3,5,'',$fmt->{title});
+	$ws->write_string(3,4,'URL',$fmt->{title});
+
+	# Start to loop through the items
+	foreach my $conv (@convs){
+		# process each element
+		$current_row += $self->_add_conversation(\$ws,$current_row,$conv);  # add to worksheet and return how much space it used
+	}
+
+	return;
+}
+
+# +
+# +   Traffic with a content type the indicates it's likely to 
+# +   be a bit torrent
+# +
+sub _conversations_media {
+	my ($self) = @_;
+	my @convs = @{$self->{CONVS}{TORRENTS}};  # localize array, just because 
+	return unless scalar(@convs);
+
+	my $ws  = $self->{WB}->add_worksheet( 'BitTorrent' );
+	my $current_row = 4;  # row to start inserting the conversation blocks
+
+	$ws->set_tab_color( 'red' );
+
+        # Set column widths
+	$ws->set_column(0,0,6);
+	$ws->set_column(1,1,16);
+	$ws->set_column(2,3,25);
+	$ws->set_column(4,5,75);
+	$ws->set_column(6,7,2);
+
+	# Add header
+	$ws->merge_range(0,0,0,7,'',$fmt->{header});
+	$ws->write_string(0,0,sprintf('BitTorrent Conversations for %s' ,$self->{title}),$fmt->{header});
 
 	# Conversation Information
 	$ws->merge_range(2,0,2,7,'',$fmt->{section});

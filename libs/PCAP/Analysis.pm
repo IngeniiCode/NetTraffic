@@ -40,6 +40,7 @@ my $REPORT  = {
 	TRAFFIC  => {},
 	ACKCHAIN => {},  # try to chain together ACKS
 	MEDIA    => {},  # media frames
+	TORRENTS => {},  # bit torrent frames
 	PAYLOAD  => {},  # some type of instructions payload
 };
 my $DNS   = {};
@@ -58,11 +59,12 @@ sub new {
 	my $class = shift;
 	my $self  = { @_ };
 	keys($REPORT->{FRAMES})   = 10000;
-	keys($REPORT->{DNS})      = 100;
+	keys($REPORT->{DNS})      = 200;
 	keys($REPORT->{TRAFFIC})  = 1000;
 	keys($REPORT->{ACKCHAIN}) = 1000;
-	keys($REPORT->{MEDIA})    = 100;
-	keys($DNS)                = 100;  
+	keys($REPORT->{MEDIA})    = 200;
+	keys($REPORT->{TORRENTS}) = 200;
+	keys($DNS)                = 200;  
 
 	# Setup the resolver
 	$Resolver = Net::DNS::Resolver->new(
@@ -478,8 +480,9 @@ sub _http {
 	$REPORT->{TRAFFIC}{URLS}{$url}{bytes}   += $$FRAME->{SIZE}||0;
 	$REPORT->{TRAFFIC}{HOSTS}{$host}{bytes} += $$FRAME->{SIZE}||0;
 	
-	$REPORT->{MEDIA}{$packet_id}   = $type if _is_media($type);
-	$REPORT->{PAYLOAD}{$packet_id} = $type if _is_payload($type);
+	$REPORT->{MEDIA}{$packet_id}    = $type if _is_media($type);
+	$REPORT->{PAYLOAD}{$packet_id}  = $type if _is_payload($type);
+	$REPORT->{TORRENTS}{$packet_id} = $type if _is_torrent($type);
 
 	#printf("%s(%s,\$raw);\n%s",uc((caller(0))[3]),$prefix,$data) if $data;
 
@@ -611,6 +614,20 @@ sub _is_media {
 		case { $_[0] =~  /video/i }   { return 1; }
 		case { $_[0] =~  /audio/i }   { return 1; }
 		case { $_[0] =~  /stream/i }  { return 1; }
+	};
+	
+	return;
+}
+
+# +
+# +  try to determine if this bit torrent stream 
+# +
+sub _is_media {
+	my($type) = @_;
+	
+	# guess at content type if not defined --- this will need to be extended!!
+	switch($type) {
+		case { $_[0] =~  /bittorrent/i }   { return 1; }
 	};
 	
 	return;
