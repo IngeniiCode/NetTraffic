@@ -6,29 +6,14 @@ use warnings;
 # =============================
 #  Define required modules
 # =============================
-use File::ParseName;
-use Solr::Application;
-use Image::GetLogo;
-use PCAP::Conversation;
-use Reporter::AppDetex;
-use Data::Dumper;
-use JSON qw( encode_json );  # From CPAN
-use Solr::Base;
+use URI::Escape;
 
 # =================================
 #  Define global scoped variables
 # =================================
-my $SOLR = new Solr::Base();
-my $AppInfo;
-my $F;
-my $C;
-my $REP;
-my $IMG;
-my $outfile;
-my $logoFile;
-my $REPORT;
-my $appID;
+my $id;
 my $file;
+my $encoded;
 
 # =================================
 $| = 1;
@@ -39,12 +24,15 @@ $| = 1;
 # =================================
 
 # Snarf in the file off arglist (not parameteized, should be fixed in later revision)
-$file = $ARGV[0];
+$id   = $ARGV[0];
+$file = $ARGV[1];
+printf("ID: %s\n",$file);
 
-$C      = new Pcap::Conversation;
-$REPORT = encode_json($C->process_file($file));
+$encoded = uri_escape($id);
 
-printf("%s",$REPORT);
+printf("FNAME:  %s.%s\n",$encoded,$file);
+
+# +
 exit;
 
 
