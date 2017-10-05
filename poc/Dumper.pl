@@ -10,7 +10,7 @@ use File::ParseName;
 use Solr::Application;
 use Image::GetLogo;
 use PCAP::Conversation;
-use Reporter::AppDetex;
+use Reporter::AppDemo;
 use Data::Dumper;
 use JSON qw( encode_json );  # From CPAN
 use Solr::Base;

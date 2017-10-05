@@ -31,7 +31,7 @@ sub new {
         $self->{WB}->set_properties(
                 title     => sprintf('%s Network Analysis Report ',$self->{title}),
 		comments  => $self->{desc},
-                author    => 'David DeMartini  fbo  Appdetex.com',
+                author    => 'David DeMartini',
                 comments  => 'Automated Network Traffic Analysis',
         );
 

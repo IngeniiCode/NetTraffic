@@ -1,5 +1,5 @@
 # =============================
-  package Reporter::Interrogator::AppDetex;
+  package Reporter::Interrogator::AppDemo;
 # =============================
 
 use strict;
@@ -11,7 +11,7 @@ use PCAP::ContentType;
 use File::Basename;
 use Text::Wrap;
 use Image::Size;
-use Reporter::FormatsAppDetex;
+use Reporter::FormatsAppDemo;
 use Data::Dumper;
 # - - - - - - - - - - - - - - - 
 my $fmt    = {};
@@ -23,7 +23,7 @@ my $orig_file;
 sub new {
 	my $class = shift;
 	my $self  = shift;
-	$self->{outfile}  = sprintf('%s.appdetex.xlsx',$self->{orig_file});	
+	$self->{outfile}  = sprintf('%s.appdemo.xlsx',$self->{orig_file});	
 	$self->{basename} = _format_filename(basename($self->{orig_file})); 
 	$self->{GEO}      = new Pcap::GeoLocate;
 	$self->{WHO}      = new Pcap::Whois;
@@ -33,7 +33,7 @@ sub new {
         $self->{WB}->set_properties(
                 title     => sprintf('%s Network Analysis Report ',$self->{title}),
 		comments  => $self->{desc},
-                author    => 'David DeMartini  fbo  Appdetex.com',
+                author    => 'David DeMartini',
                 comments  => 'Automated Network Traffic Analysis',
         );
 
@@ -110,7 +110,7 @@ sub _summary {
 	# Add banner
 	$sum_ws->set_row(0,32);
 	$sum_ws->merge_range($block_start,0,$block_start,14,'',$fmt->{banner});
-	$sum_ws->write_string($block_start,0,'AppDetex App Interrogation Report',$fmt->{banner});
+	$sum_ws->write_string($block_start,0,'AppDemo App Interrogation Report',$fmt->{banner});
 
 	# Content for Investigation 
 	$block_start += 2;

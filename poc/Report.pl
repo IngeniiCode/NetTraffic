@@ -10,7 +10,7 @@ use File::ParseName;
 use Solr::Application;
 use Image::GetLogo;
 use PCAP::Conversation;
-use Reporter::AppDetex;
+use Reporter::AppDemo;
 use Data::Dumper;
 use Solr::Base;
 
@@ -75,7 +75,7 @@ my $tcfg = {
 	downloads => $AppInfo->{numDownload},
 	logo      => $logoFile,
 };
-$REP  = Reporter::Interrogator::AppDetex->new($tcfg);
+$REP  = Reporter::Interrogator::AppDemo->new($tcfg);
 
 printf("Extrating Conversations from:%s\n",$file);
 $C      = new Pcap::Conversation;
